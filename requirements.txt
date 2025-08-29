@@ -1,0 +1,19 @@
+# Python dependencies for Govhack2025-Datacetnres
+# Note: On Windows, installing geospatial stack is easiest via conda-forge.
+# For pip users, the pins below are recent stable versions known to work together.
+
+# App framework and general scientific stack
+streamlit==1.49.0
+numpy==2.3.2
+pandas==2.3.2
+pydeck==0.9.1
+requests==2.32.5
+
+# Geospatial stack
+# geopandas depends on shapely and either pyogrio or fiona/GDAL for IO.
+# We prefer pyogrio for reading GeoPackage; fiona is provided as an alternative.
+geopandas==1.1.1
+shapely==2.1.1
+pyogrio==0.11.1
+fiona==1.10.1
+
