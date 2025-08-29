@@ -157,7 +157,7 @@ class RealDataFetcher {
     async fetchRealBOMData() {
         try {
             // BOM weather observation JSON
-            const bomUrl = 'http://reg.bom.gov.au/fwo/IDN60901/IDN60901.94767.json'; // Sydney
+            const bomUrl = 'https://reg.bom.gov.au/fwo/IDN60901/IDN60901.94767.json'; // Sydney
             
             const response = await fetch(this.corsProxy + bomUrl);
             
