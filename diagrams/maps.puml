@@ -1,0 +1,99 @@
+@startuml
+title Maps Architecture and Data Flow for Interactive Heatmap
+
+' High-level components + data flow appropriate for "make the maps"
+skinparam componentStyle rectangle
+skinparam packageStyle rectangle
+skinparam rectangle {
+  BackgroundColor<<frontend>> #E8F5E9
+  BackgroundColor<<backend>> #E3F2FD
+  BackgroundColor<<data>> #FFFDE7
+  BackgroundColor<<infra>> #F3E5F5
+}
+
+actor "User" as user
+
+package "Frontend" <<frontend>> {
+  component "Web App (SPA)" as SPA
+  component "Map UI (MapLibre/Leaflet)" as Map
+  component "Heatmap Layer" as Heat
+  SPA --> Map
+  Map --> Heat
+}
+
+package "Backend" <<backend>> {
+  [API Gateway] as APIGW
+  [Tile Service] as TileSvc
+  [Heatmap API] as HeatAPI
+  [Aggregation Service] as AggSvc
+  [Grid Normalizer] as GridNorm
+  APIGW --> TileSvc
+  APIGW --> HeatAPI
+  AggSvc --> GridNorm
+}
+
+package "Pipelines (N)" <<backend>> {
+  [Orchestrator] as Orchestrator
+  [Message Queue] as MQ
+  [Pipeline 1] as P1
+  [Pipeline 2] as P2
+  [Pipeline 3..N] as PN
+  Orchestrator --> MQ
+  MQ <-r- P1
+  MQ <-r- P2
+  MQ <-r- PN
+}
+
+package "Data Stores" <<data>> {
+  database "Raw Data Lake" as Raw
+  database "Grid Store" as Grid
+  database "Heatmap Store" as HeatStore
+  [Metadata Catalog] as Meta
+}
+
+package "External" <<infra>> {
+  cloud "Source A" as SA
+  cloud "Source B" as SB
+  cloud "Source 3..N" as SN
+  [Base Map Provider] as Basemap
+  [CDN] as CDN
+}
+
+' Frontend requests
+user --> SPA
+SPA --> CDN : static assets
+Map --> Basemap : XYZ tiles
+Heat --> APIGW : GET /tiles/heat/{z}/{x}/{y}
+APIGW --> TileSvc
+TileSvc --> HeatStore : fetch tile
+TileSvc ..> AggSvc : cache miss -> generate
+
+' Ingestion
+SA --> P1 : raw geospatial
+SB --> P2
+SN --> PN
+P1 --> Raw
+P2 --> Raw
+PN --> Raw
+
+' Normalization to common grid
+P1 --> GridNorm
+P2 --> GridNorm
+PN --> GridNorm
+GridNorm --> Grid : aligned grids
+GridNorm --> Meta : update metadata
+
+' Aggregation/weighting
+AggSvc --> Grid : read inputs
+AggSvc --> Meta : weights/specs
+AggSvc --> HeatStore : write heat tiles
+HeatAPI --> HeatStore : window/timeseries
+
+note right of AggSvc
+  H(x,y,t) = Σ w_i(t) * f_i(grid_i(x,y,t))
+  - Align CRS and resolution
+  - Handle missing data
+  - Optional time decay
+end note
+
+@enduml
