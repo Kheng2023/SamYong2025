@@ -190,6 +190,69 @@
             margin-right: 10px;
             border-radius: 3px;
         }
+
+        /* Custom marker styles */
+        .custom-marker {
+            border: none !important;
+            background: none !important;
+        }
+
+        /* Notification animations */
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes slideOut {
+            from {
+                transform: translateX(0);
+                opacity: 1;
+            }
+            to {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+        }
+
+        /* Layer toggle improvements */
+        .layer-control {
+            background: rgba(255, 255, 255, 0.9);
+            padding: 8px;
+            margin: 5px 0;
+            border-radius: 5px;
+            border-left: 4px solid #3498db;
+        }
+
+        .layer-control input[type="checkbox"]:checked + label {
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        /* Legend styles */
+        .legend-container {
+            background: rgba(255, 255, 255, 0.9);
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 5px 0;
+            font-size: 14px;
+        }
+
+        .legend-item:not(:last-child) {
+            border-bottom: 1px solid #eee;
+        }
     </style>
 </head>
 <body>
@@ -250,6 +313,27 @@
 
                 <button class="btn" onclick="loadSampleData()">📊 Load Sample Australian Data</button>
                 <button class="btn" onclick="loadGovernmentData()">🏛️ Load Government Datasets</button>
+                <button class="btn" onclick="resetMap()" style="background: #dc3545; color: white;">
+                    🗑️ Reset Map
+                </button>
+            </div>
+
+            <div class="section">
+                <h3>🔴 Real Government Data</h3>
+                <div class="button-group">
+                    <button class="btn" onclick="loadRealGovernmentData()" style="background: #dc3545; color: white;">
+                        🔴 Load REAL Data
+                    </button>
+                    <button class="btn" onclick="demonstrateRealDataFetching()" style="background: #17a2b8; color: white;">
+                        🔍 Test API Status
+                    </button>
+                </div>
+                <div style="margin-top: 10px;">
+                    <small style="color: #666;">
+                        ⚠️ Fetches live data from Australian government APIs<br>
+                        📡 May require CORS proxy for browser compatibility
+                    </small>
+                </div>
             </div>
 
             <div class="section">
@@ -284,6 +368,36 @@
                         <input type="checkbox" id="geology-toggle" checked>
                         <label for="geology-toggle">Geology</label>
                         <input type="range" id="geology-opacity" min="0" max="1" step="0.1" value="0.8">
+                    </div>
+                </div>
+            </div>
+
+            <div class="section">
+                <h3>🎨 Visual Legend</h3>
+                <div class="legend-container">
+                    <div class="legend-item">
+                        <span style="color: #2980b9; font-size: 16px;">🛣️ ●</span>
+                        <span>Roads & Transport</span>
+                    </div>
+                    <div class="legend-item">
+                        <span style="color: #f39c12; font-size: 16px;">⚡ ■</span>
+                        <span>Electricity Grid</span>
+                    </div>
+                    <div class="legend-item">
+                        <span style="color: #9b59b6; font-size: 16px;">📡 ▲</span>
+                        <span>Telecommunications</span>
+                    </div>
+                    <div class="legend-item">
+                        <span style="color: #3498db; font-size: 16px;">💧 ♦</span>
+                        <span>Water Infrastructure</span>
+                    </div>
+                    <div class="legend-item">
+                        <span style="color: #e74c3c; font-size: 16px;">🌡️ ★</span>
+                        <span>Climate Data</span>
+                    </div>
+                    <div class="legend-item">
+                        <span style="color: #2ecc71; font-size: 16px;">🏔️ ⬢</span>
+                        <span>Geological Data</span>
                     </div>
                 </div>
             </div>
@@ -385,6 +499,9 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="data-sources.js"></script>
     <script src="suitability-analyzer.js"></script>
+    <script src="government-data-integrator.js"></script>
+    <script src="data-upload-interface.js"></script>
+    <script src="real-data-fetcher.js"></script>
     <script src="demo.js"></script>
     <script>
         // Initialize map centered on Australia
@@ -397,14 +514,17 @@
 
         // Layer groups for different data types
         const layers = {
-            roads: L.layerGroup().addTo(map),
-            electricity: L.layerGroup().addTo(map),
-            telecommunications: L.layerGroup().addTo(map),
-            water: L.layerGroup().addTo(map),
-            climate: L.layerGroup().addTo(map),
-            geology: L.layerGroup().addTo(map),
-            analysis: L.layerGroup().addTo(map)
+            roads: L.layerGroup(),
+            electricity: L.layerGroup(),
+            telecommunications: L.layerGroup(),
+            water: L.layerGroup(),
+            climate: L.layerGroup(),
+            geology: L.layerGroup(),
+            analysis: L.layerGroup()
         };
+
+        // Add only the analysis layer by default (start clean)
+        layers.analysis.addTo(map);
 
         // Data storage
         let uploadedData = {
@@ -460,47 +580,255 @@
             reader.readAsText(file);
         }
 
-        // Add GeoJSON layer to map
+        // Add GeoJSON layer to map with distinct visual indicators
         function addGeoJSONLayer(data, layerType) {
-            const colors = {
-                roads: '#2980b9',
-                electricity: '#f39c12',
-                telecommunications: '#9b59b6',
-                water: '#3498db',
-                climate: '#e74c3c',
-                geology: '#2ecc71'
+            const layerConfig = {
+                roads: {
+                    color: '#2980b9',
+                    icon: '🛣️',
+                    shape: 'line',
+                    radius: 6,
+                    symbol: '●'
+                },
+                electricity: {
+                    color: '#f39c12',
+                    icon: '⚡',
+                    shape: 'square',
+                    radius: 8,
+                    symbol: '■'
+                },
+                telecommunications: {
+                    color: '#9b59b6',
+                    icon: '📡',
+                    shape: 'triangle',
+                    radius: 10,
+                    symbol: '▲'
+                },
+                water: {
+                    color: '#3498db',
+                    icon: '💧',
+                    shape: 'diamond',
+                    radius: 7,
+                    symbol: '♦'
+                },
+                climate: {
+                    color: '#e74c3c',
+                    icon: '🌡️',
+                    shape: 'star',
+                    radius: 9,
+                    symbol: '★'
+                },
+                geology: {
+                    color: '#2ecc71',
+                    icon: '🏔️',
+                    shape: 'hexagon',
+                    radius: 8,
+                    symbol: '⬢'
+                }
             };
 
+            const config = layerConfig[layerType];
+            
+            // Clear existing layer
             layers[layerType].clearLayers();
             
-            L.geoJSON(data, {
+            // Create custom icon for markers
+            function createCustomMarker(latlng, feature) {
+                const markerHtml = `
+                    <div style="
+                        background-color: ${config.color};
+                        color: white;
+                        width: ${config.radius * 3}px;
+                        height: ${config.radius * 3}px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        border-radius: ${config.shape === 'square' ? '0' : '50%'};
+                        border: 2px solid white;
+                        font-size: 12px;
+                        font-weight: bold;
+                        box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+                        ${config.shape === 'triangle' ? 'clip-path: polygon(50% 0%, 0% 100%, 100% 100%);' : ''}
+                        ${config.shape === 'diamond' ? 'transform: rotate(45deg);' : ''}
+                        ${config.shape === 'star' ? 'clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);' : ''}
+                        ${config.shape === 'hexagon' ? 'clip-path: polygon(30% 0%, 70% 0%, 100% 50%, 70% 100%, 30% 100%, 0% 50%);' : ''}
+                    ">
+                        ${config.icon}
+                    </div>
+                `;
+                
+                const icon = L.divIcon({
+                    html: markerHtml,
+                    iconSize: [config.radius * 3, config.radius * 3],
+                    iconAnchor: [config.radius * 1.5, config.radius * 1.5],
+                    className: 'custom-marker'
+                });
+                
+                return L.marker(latlng, { icon: icon });
+            }
+            
+            // Add layer with custom styling
+            const layer = L.geoJSON(data, {
                 style: {
-                    color: colors[layerType],
+                    color: config.color,
                     weight: 3,
-                    opacity: 0.8
+                    opacity: 0.8,
+                    fillColor: config.color,
+                    fillOpacity: 0.3
                 },
                 pointToLayer: function(feature, latlng) {
-                    return L.circleMarker(latlng, {
-                        radius: 8,
-                        fillColor: colors[layerType],
-                        color: colors[layerType],
-                        weight: 2,
-                        opacity: 1,
-                        fillOpacity: 0.8
-                    });
+                    return createCustomMarker(latlng, feature);
                 },
                 onEachFeature: function(feature, layer) {
                     if (feature.properties) {
-                        layer.bindPopup(createPopupContent(feature.properties, layerType));
+                        const popupContent = `
+                            <div style="font-family: Arial, sans-serif;">
+                                <h4 style="margin: 0 0 10px 0; color: ${config.color};">
+                                    ${config.icon} ${layerType.toUpperCase()} Data
+                                </h4>
+                                ${createPopupContent(feature.properties, layerType)}
+                            </div>
+                        `;
+                        layer.bindPopup(popupContent);
                     }
                 }
             }).addTo(layers[layerType]);
 
-            // Fit map to data bounds if it's the first layer
-            if (Object.values(uploadedData).filter(d => d).length === 1) {
-                const bounds = L.geoJSON(data).getBounds();
-                map.fitBounds(bounds);
+            // Add the layer to map and show notification
+            if (!map.hasLayer(layers[layerType])) {
+                layers[layerType].addTo(map);
             }
+            
+            // Show data loading notification
+            showDataLoadedNotification(layerType, data.features ? data.features.length : 0, config);
+
+            // Fit map to data bounds if it's the first layer with actual data
+            const layersWithData = Object.keys(uploadedData).filter(key => uploadedData[key]);
+            if (layersWithData.length === 1) {
+                const bounds = L.geoJSON(data).getBounds();
+                if (bounds.isValid()) {
+                    map.fitBounds(bounds);
+                }
+            }
+        }
+
+        // Show data loaded notification
+        function showDataLoadedNotification(layerType, featureCount, config) {
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: ${config.color};
+                color: white;
+                padding: 12px 20px;
+                border-radius: 8px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                z-index: 1000;
+                font-family: Arial, sans-serif;
+                font-weight: bold;
+                max-width: 300px;
+                animation: slideIn 0.3s ease-out;
+            `;
+            
+            notification.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 16px;">${config.icon}</span>
+                    <div>
+                        <div>${layerType.toUpperCase()} DATA LOADED</div>
+                        <div style="font-size: 12px; opacity: 0.9;">${featureCount} features • ${config.symbol} markers</div>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            // Remove after 3 seconds
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.style.animation = 'slideOut 0.3s ease-in';
+                    setTimeout(() => {
+                        if (notification.parentNode) {
+                            notification.parentNode.removeChild(notification);
+                        }
+                    }, 300);
+                }
+            }, 3000);
+        }
+
+        // Reset map to clean state
+        function resetMap() {
+            // Clear all layers
+            Object.values(layers).forEach(layer => {
+                layer.clearLayers();
+            });
+            
+            // Reset uploaded data
+            uploadedData = {
+                roads: null,
+                electricity: null,
+                telecommunications: null,
+                water: null,
+                climate: null,
+                geology: null
+            };
+            
+            // Remove layers from map
+            Object.values(layers).forEach(layer => {
+                if (map.hasLayer(layer)) {
+                    map.removeLayer(layer);
+                }
+            });
+            
+            // Re-add only analysis layer
+            layers.analysis.addTo(map);
+            
+            // Reset map view to Australia
+            map.setView([-25.2744, 133.7751], 5);
+            
+            // Clear analysis results
+            const resultsDiv = document.getElementById('analysis-results');
+            if (resultsDiv) {
+                resultsDiv.style.display = 'none';
+            }
+            
+            // Reset layer toggles
+            Object.keys(layers).forEach(layerType => {
+                const toggle = document.getElementById(`${layerType}-toggle`);
+                if (toggle) {
+                    toggle.checked = false;
+                }
+            });
+            
+            // Show reset notification
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: #dc3545;
+                color: white;
+                padding: 12px 20px;
+                border-radius: 8px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                z-index: 1000;
+                font-family: Arial, sans-serif;
+                font-weight: bold;
+            `;
+            
+            notification.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 16px;">🗑️</span>
+                    <div>MAP RESET TO CLEAN STATE</div>
+                </div>
+            `;
+            
+            document.body.appendChild(notification);
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.parentNode.removeChild(notification);
+                }
+            }, 2000);
         }
 
         // Parse CSV data
@@ -522,19 +850,11 @@
             return data;
         }
 
-        // Add CSV layer as points
+        // Add CSV layer as points using new visual system
         function addCSVLayer(data, layerType) {
-            const colors = {
-                roads: '#2980b9',
-                electricity: '#f39c12',
-                telecommunications: '#9b59b6',
-                water: '#3498db',
-                climate: '#e74c3c',
-                geology: '#2ecc71'
-            };
-
-            layers[layerType].clearLayers();
-
+            // Convert CSV data to GeoJSON format
+            const features = [];
+            
             data.forEach(row => {
                 let lat, lng;
                 
@@ -550,16 +870,24 @@
                 }
 
                 if (lat && lng && !isNaN(lat) && !isNaN(lng)) {
-                    const marker = L.circleMarker([lat, lng], {
-                        color: colors[layerType],
-                        radius: 6,
-                        fillOpacity: 0.8
+                    features.push({
+                        type: "Feature",
+                        geometry: {
+                            type: "Point",
+                            coordinates: [lng, lat]
+                        },
+                        properties: row
                     });
-                    
-                    marker.bindPopup(createPopupContent(row, layerType));
-                    marker.addTo(layers[layerType]);
                 }
             });
+
+            const geoJsonData = {
+                type: "FeatureCollection",
+                features: features
+            };
+
+            // Use the enhanced GeoJSON layer function
+            addGeoJSONLayer(geoJsonData, layerType);
         }
 
         // Create popup content

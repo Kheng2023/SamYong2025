@@ -9,49 +9,41 @@ class PlatformDemo {
                 title: "Welcome to the Data Center Analysis Platform",
                 description: "This platform helps you find optimal locations for data centers across Australia using government datasets.",
                 action: "highlight-title",
-                duration: 3000
             },
             {
                 title: "Step 1: Load Infrastructure Data",
                 description: "We'll start by loading sample Australian infrastructure data including power, telecommunications, and transport networks.",
                 action: "load-sample-data",
-                duration: 4000
             },
             {
                 title: "Step 2: Configure Analysis Parameters",
                 description: "Adjust the importance weights for different factors like power infrastructure (25%), telecommunications (20%), etc.",
                 action: "highlight-parameters",
-                duration: 3000
             },
             {
                 title: "Step 3: Run Advanced Analysis",
                 description: "Execute the multi-criteria analysis algorithm to evaluate all possible locations.",
                 action: "run-analysis",
-                duration: 8000
             },
             {
                 title: "Step 4: View Results",
                 description: "See the color-coded suitability map and identify the top 5 optimal locations.",
                 action: "show-results",
-                duration: 4000
             },
             {
                 title: "Step 5: Detailed Site Information",
                 description: "Click on any location to see detailed analysis including scores for each factor and risk assessment.",
                 action: "show-popup",
-                duration: 5000
             },
             {
                 title: "Step 6: Generate Reports",
                 description: "Download comprehensive reports for decision-making and stakeholder communication.",
                 action: "generate-report",
-                duration: 3000
             },
             {
                 title: "Demo Complete!",
                 description: "You can now explore the platform independently. Try uploading your own data or adjusting parameters.",
                 action: "demo-complete",
-                duration: 3000
             }
         ];
         this.isRunning = false;
