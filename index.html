@@ -1,0 +1,1149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Center Location Analysis - Australia</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+        }
+
+        .container {
+            display: flex;
+            height: 100vh;
+        }
+
+        .sidebar {
+            width: 350px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 20px;
+            overflow-y: auto;
+            box-shadow: 2px 0 20px rgba(0,0,0,0.1);
+        }
+
+        .main-content {
+            flex: 1;
+            position: relative;
+        }
+
+        #map {
+            width: 100%;
+            height: 100vh;
+        }
+
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-size: 24px;
+            text-align: center;
+        }
+
+        .section {
+            margin-bottom: 25px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.8);
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        .section h3 {
+            color: #34495e;
+            margin-bottom: 15px;
+            font-size: 18px;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 5px;
+        }
+
+        .upload-area {
+            border: 2px dashed #3498db;
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-bottom: 10px;
+        }
+
+        .upload-area:hover {
+            border-color: #2980b9;
+            background-color: rgba(52, 152, 219, 0.1);
+        }
+
+        .upload-area.dragover {
+            border-color: #27ae60;
+            background-color: rgba(46, 204, 113, 0.1);
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .btn {
+            background: linear-gradient(45deg, #3498db, #2980b9);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            margin: 5px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+
+        .btn-danger {
+            background: linear-gradient(45deg, #e74c3c, #c0392b);
+        }
+
+        .layer-control {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+            padding: 8px;
+            background: rgba(255, 255, 255, 0.7);
+            border-radius: 6px;
+        }
+
+        .layer-control input[type="checkbox"] {
+            margin-right: 10px;
+        }
+
+        .layer-control input[type="range"] {
+            margin-left: auto;
+            width: 80px;
+        }
+
+        .analysis-results {
+            background: rgba(46, 204, 113, 0.1);
+            border: 1px solid #27ae60;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 10px;
+        }
+
+        .info-panel {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            max-width: 300px;
+            z-index: 1000;
+        }
+
+        .score-indicator {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 20px;
+            color: white;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+
+        .score-high { background-color: #27ae60; }
+        .score-medium { background-color: #f39c12; }
+        .score-low { background-color: #e74c3c; }
+
+        .legend {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            z-index: 1000;
+        }
+
+        .legend h4 {
+            margin-bottom: 10px;
+            color: #2c3e50;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            margin-right: 10px;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="sidebar">
+            <h1>🏢 Data Center Analysis</h1>
+            
+            <div class="section">
+                <h3>📍 Infrastructure Data Upload</h3>
+                
+                <div class="upload-section">
+                    <label>Roads Network:</label>
+                    <div class="upload-area" onclick="document.getElementById('roads-file').click()">
+                        <p>📁 Click or drag roads data (GeoJSON, KML, CSV)</p>
+                        <input type="file" id="roads-file" accept=".geojson,.kml,.csv,.json" />
+                    </div>
+                </div>
+
+                <div class="upload-section">
+                    <label>Electricity Grid:</label>
+                    <div class="upload-area" onclick="document.getElementById('electricity-file').click()">
+                        <p>⚡ Click or drag electricity data</p>
+                        <input type="file" id="electricity-file" accept=".geojson,.kml,.csv,.json" />
+                    </div>
+                </div>
+
+                <div class="upload-section">
+                    <label>Telecommunications:</label>
+                    <div class="upload-area" onclick="document.getElementById('telecom-file').click()">
+                        <p>📡 Click or drag telecommunications data</p>
+                        <input type="file" id="telecom-file" accept=".geojson,.kml,.csv,.json" />
+                    </div>
+                </div>
+
+                <div class="upload-section">
+                    <label>Water Infrastructure:</label>
+                    <div class="upload-area" onclick="document.getElementById('water-file').click()">
+                        <p>💧 Click or drag water infrastructure data</p>
+                        <input type="file" id="water-file" accept=".geojson,.kml,.csv,.json" />
+                    </div>
+                </div>
+
+                <div class="upload-section">
+                    <label>Climate Data:</label>
+                    <div class="upload-area" onclick="document.getElementById('climate-file').click()">
+                        <p>🌡️ Click or drag climate data</p>
+                        <input type="file" id="climate-file" accept=".geojson,.kml,.csv,.json" />
+                    </div>
+                </div>
+
+                <div class="upload-section">
+                    <label>Geological Data:</label>
+                    <div class="upload-area" onclick="document.getElementById('geology-file').click()">
+                        <p>🏔️ Click or drag geological data</p>
+                        <input type="file" id="geology-file" accept=".geojson,.kml,.csv,.json" />
+                    </div>
+                </div>
+
+                <button class="btn" onclick="loadSampleData()">📊 Load Sample Australian Data</button>
+                <button class="btn" onclick="loadGovernmentData()">🏛️ Load Government Datasets</button>
+            </div>
+
+            <div class="section">
+                <h3>🗂️ Layer Controls</h3>
+                <div id="layer-controls">
+                    <div class="layer-control">
+                        <input type="checkbox" id="roads-toggle" checked>
+                        <label for="roads-toggle">Roads</label>
+                        <input type="range" id="roads-opacity" min="0" max="1" step="0.1" value="0.8">
+                    </div>
+                    <div class="layer-control">
+                        <input type="checkbox" id="electricity-toggle" checked>
+                        <label for="electricity-toggle">Electricity</label>
+                        <input type="range" id="electricity-opacity" min="0" max="1" step="0.1" value="0.8">
+                    </div>
+                    <div class="layer-control">
+                        <input type="checkbox" id="telecommunications-toggle" checked>
+                        <label for="telecommunications-toggle">Telecom</label>
+                        <input type="range" id="telecommunications-opacity" min="0" max="1" step="0.1" value="0.8">
+                    </div>
+                    <div class="layer-control">
+                        <input type="checkbox" id="water-toggle" checked>
+                        <label for="water-toggle">Water</label>
+                        <input type="range" id="water-opacity" min="0" max="1" step="0.1" value="0.8">
+                    </div>
+                    <div class="layer-control">
+                        <input type="checkbox" id="climate-toggle" checked>
+                        <label for="climate-toggle">Climate</label>
+                        <input type="range" id="climate-opacity" min="0" max="1" step="0.1" value="0.8">
+                    </div>
+                    <div class="layer-control">
+                        <input type="checkbox" id="geology-toggle" checked>
+                        <label for="geology-toggle">Geology</label>
+                        <input type="range" id="geology-opacity" min="0" max="1" step="0.1" value="0.8">
+                    </div>
+                </div>
+            </div>
+
+            <div class="section">
+                <h3>🎯 Analysis Tools</h3>
+                <button class="btn" onclick="performAdvancedSuitabilityAnalysis()">🔍 Advanced Suitability Analysis</button>
+                <button class="btn" onclick="findOptimalLocations()">📍 Find Top 5 Optimal Sites</button>
+                <button class="btn" onclick="generateComparativeReport()">📊 Generate Comparative Report</button>
+                <button class="btn" onclick="performRiskAssessment()">⚠️ Risk Assessment</button>
+                <button class="btn" onclick="generateBuffer()">⭕ Generate Proximity Zones</button>
+                <button class="btn btn-danger" onclick="clearAnalysis()">🗑️ Clear Analysis</button>
+
+                <div id="analysis-results" style="display: none;">
+                    <div class="analysis-results">
+                        <h4>Analysis Results</h4>
+                        <div id="results-content"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section">
+                <h3>⚙️ Analysis Parameters</h3>
+                <label>Power Infrastructure Weight:</label>
+                <input type="range" id="power-weight" min="0" max="1" step="0.05" value="0.25">
+                <span id="power-weight-value">25%</span>
+
+                <label>Telecommunications Weight:</label>
+                <input type="range" id="connectivity-weight" min="0" max="1" step="0.05" value="0.20">
+                <span id="connectivity-weight-value">20%</span>
+
+                <label>Climate/Cooling Weight:</label>
+                <input type="range" id="cooling-weight" min="0" max="1" step="0.05" value="0.15">
+                <span id="cooling-weight-value">15%</span>
+
+                <label>Water Supply Weight:</label>
+                <input type="range" id="water-weight" min="0" max="1" step="0.05" value="0.12">
+                <span id="water-weight-value">12%</span>
+
+                <label>Transportation Weight:</label>
+                <input type="range" id="transport-weight" min="0" max="1" step="0.05" value="0.10">
+                <span id="transport-weight-value">10%</span>
+
+                <label>Geological Stability Weight:</label>
+                <input type="range" id="geology-weight" min="0" max="1" step="0.05" value="0.08">
+                <span id="geology-weight-value">8%</span>
+
+                <label>Security Weight:</label>
+                <input type="range" id="security-weight" min="0" max="1" step="0.05" value="0.05">
+                <span id="security-weight-value">5%</span>
+
+                <label>Regulatory Weight:</label>
+                <input type="range" id="regulatory-weight" min="0" max="1" step="0.05" value="0.05">
+                <span id="regulatory-weight-value">5%</span>
+
+                <hr style="margin: 15px 0;">
+                
+                <label>Analysis Grid Resolution:</label>
+                <select id="grid-resolution">
+                    <option value="0.1">High (0.1°)</option>
+                    <option value="0.25" selected>Medium (0.25°)</option>
+                    <option value="0.5">Low (0.5°)</option>
+                </select>
+
+                <label>Search Radius (km):</label>
+                <input type="range" id="search-radius" min="1" max="100" value="50">
+                <span id="radius-value">50</span> km
+
+                <button class="btn" onclick="resetDefaultWeights()">🔄 Reset Default Weights</button>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div id="map"></div>
+            
+            <div class="info-panel" id="info-panel" style="display: none;">
+                <h4>📍 Location Info</h4>
+                <div id="location-details"></div>
+            </div>
+
+            <div class="legend">
+                <h4>Legend</h4>
+                <div class="legend-item">
+                    <div class="legend-color score-high"></div>
+                    <span>High Suitability</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color score-medium"></div>
+                    <span>Medium Suitability</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color score-low"></div>
+                    <span>Low Suitability</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="data-sources.js"></script>
+    <script src="suitability-analyzer.js"></script>
+    <script src="demo.js"></script>
+    <script>
+        // Initialize map centered on Australia
+        const map = L.map('map').setView([-25.2744, 133.7751], 5);
+
+        // Add base map
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        // Layer groups for different data types
+        const layers = {
+            roads: L.layerGroup().addTo(map),
+            electricity: L.layerGroup().addTo(map),
+            telecommunications: L.layerGroup().addTo(map),
+            water: L.layerGroup().addTo(map),
+            climate: L.layerGroup().addTo(map),
+            geology: L.layerGroup().addTo(map),
+            analysis: L.layerGroup().addTo(map)
+        };
+
+        // Data storage
+        let uploadedData = {
+            roads: null,
+            electricity: null,
+            telecommunications: null,
+            water: null,
+            climate: null,
+            geology: null
+        };
+
+        // Initialize data sources and analyzer
+        const dataSourceManager = new AustralianDataSources();
+        const suitabilityAnalyzer = new DataCenterSuitabilityAnalyzer();
+        let currentAnalysisResults = [];
+
+        // File upload handlers
+        function setupFileUpload(fileId, layerType) {
+            const fileInput = document.getElementById(fileId);
+            if (fileInput) {
+                fileInput.addEventListener('change', function(e) {
+                    const file = e.target.files[0];
+                    if (file) {
+                        processFile(file, layerType);
+                    }
+                });
+            }
+        }
+
+        // Process uploaded files
+        function processFile(file, layerType) {
+            const reader = new FileReader();
+            
+            reader.onload = function(e) {
+                try {
+                    let data;
+                    if (file.name.endsWith('.json') || file.name.endsWith('.geojson')) {
+                        data = JSON.parse(e.target.result);
+                        addGeoJSONLayer(data, layerType);
+                    } else if (file.name.endsWith('.csv')) {
+                        data = parseCSV(e.target.result);
+                        addCSVLayer(data, layerType);
+                    }
+                    
+                    uploadedData[layerType] = data;
+                    updateLayerControls();
+                    
+                } catch (error) {
+                    alert('Error processing file: ' + error.message);
+                }
+            };
+            
+            reader.readAsText(file);
+        }
+
+        // Add GeoJSON layer to map
+        function addGeoJSONLayer(data, layerType) {
+            const colors = {
+                roads: '#2980b9',
+                electricity: '#f39c12',
+                telecommunications: '#9b59b6',
+                water: '#3498db',
+                climate: '#e74c3c',
+                geology: '#2ecc71'
+            };
+
+            layers[layerType].clearLayers();
+            
+            L.geoJSON(data, {
+                style: {
+                    color: colors[layerType],
+                    weight: 3,
+                    opacity: 0.8
+                },
+                pointToLayer: function(feature, latlng) {
+                    return L.circleMarker(latlng, {
+                        radius: 8,
+                        fillColor: colors[layerType],
+                        color: colors[layerType],
+                        weight: 2,
+                        opacity: 1,
+                        fillOpacity: 0.8
+                    });
+                },
+                onEachFeature: function(feature, layer) {
+                    if (feature.properties) {
+                        layer.bindPopup(createPopupContent(feature.properties, layerType));
+                    }
+                }
+            }).addTo(layers[layerType]);
+
+            // Fit map to data bounds if it's the first layer
+            if (Object.values(uploadedData).filter(d => d).length === 1) {
+                const bounds = L.geoJSON(data).getBounds();
+                map.fitBounds(bounds);
+            }
+        }
+
+        // Parse CSV data
+        function parseCSV(csvText) {
+            const lines = csvText.split('\n');
+            const headers = lines[0].split(',').map(h => h.trim());
+            const data = [];
+
+            for (let i = 1; i < lines.length; i++) {
+                if (lines[i].trim()) {
+                    const values = lines[i].split(',');
+                    const row = {};
+                    headers.forEach((header, index) => {
+                        row[header] = values[index] ? values[index].trim() : '';
+                    });
+                    data.push(row);
+                }
+            }
+            return data;
+        }
+
+        // Add CSV layer as points
+        function addCSVLayer(data, layerType) {
+            const colors = {
+                roads: '#2980b9',
+                electricity: '#f39c12',
+                telecommunications: '#9b59b6',
+                water: '#3498db',
+                climate: '#e74c3c',
+                geology: '#2ecc71'
+            };
+
+            layers[layerType].clearLayers();
+
+            data.forEach(row => {
+                let lat, lng;
+                
+                // Try to find lat/lng columns with various names
+                const latKeys = ['lat', 'latitude', 'y', 'Latitude', 'LAT'];
+                const lngKeys = ['lng', 'lon', 'longitude', 'x', 'Longitude', 'LON'];
+                
+                for (let key of latKeys) {
+                    if (row[key]) lat = parseFloat(row[key]);
+                }
+                for (let key of lngKeys) {
+                    if (row[key]) lng = parseFloat(row[key]);
+                }
+
+                if (lat && lng && !isNaN(lat) && !isNaN(lng)) {
+                    const marker = L.circleMarker([lat, lng], {
+                        color: colors[layerType],
+                        radius: 6,
+                        fillOpacity: 0.8
+                    });
+                    
+                    marker.bindPopup(createPopupContent(row, layerType));
+                    marker.addTo(layers[layerType]);
+                }
+            });
+        }
+
+        // Create popup content
+        function createPopupContent(properties, layerType) {
+            let content = `<strong>${layerType.toUpperCase()} Infrastructure</strong><br>`;
+            for (let key in properties) {
+                if (properties[key]) {
+                    content += `<strong>${key}:</strong> ${properties[key]}<br>`;
+                }
+            }
+            return content;
+        }
+
+        // Load sample data for demonstration
+        function loadSampleData() {
+            // Clear existing layers
+            Object.values(layers).forEach(layer => {
+                if (layer !== layers.analysis) layer.clearLayers();
+            });
+
+            // Load all sample datasets
+            const datasets = [
+                'electricityGrid', 'telecommunications', 'waterSupply', 
+                'transport', 'climate', 'geology'
+            ];
+
+            datasets.forEach(datasetName => {
+                const data = dataSourceManager.getSampleDataset(datasetName);
+                if (data) {
+                    const layerType = datasetName === 'electricityGrid' ? 'electricity' :
+                                     datasetName === 'waterSupply' ? 'water' :
+                                     datasetName === 'transport' ? 'roads' :
+                                     datasetName;
+                    
+                    addGeoJSONLayer(data, layerType);
+                    uploadedData[layerType] = data;
+                }
+            });
+
+            alert('Sample Australian infrastructure data loaded! You can now perform advanced analysis.');
+        }
+
+        // Load government datasets
+        function loadGovernmentData() {
+            const sources = dataSourceManager.getAvailableDataSources();
+            let message = 'Available Australian Government Data Sources:\n\n';
+            
+            sources.forEach(source => {
+                message += `• ${source.name}\n  ${source.description}\n\n`;
+            });
+            
+            message += 'Note: This demo uses sample data. In production, this would fetch real government datasets via APIs.';
+            alert(message);
+            
+            // For demo, load sample data
+            loadSampleData();
+        }
+
+        // Advanced suitability analysis
+        function performAdvancedSuitabilityAnalysis() {
+            const resultsDiv = document.getElementById('analysis-results');
+            const resultsContent = document.getElementById('results-content');
+            
+            // Clear previous analysis
+            layers.analysis.clearLayers();
+            currentAnalysisResults = [];
+            
+            // Get current weights from UI
+            updateAnalysisWeights();
+            
+            // Get grid resolution
+            const gridSize = parseFloat(document.getElementById('grid-resolution').value);
+            
+            // Generate analysis grid
+            const bounds = map.getBounds();
+            let analysisCount = 0;
+            const maxAnalyses = 200; // Limit for performance
+            
+            resultsContent.innerHTML = '<p>🔍 Running advanced suitability analysis...</p>';
+            resultsDiv.style.display = 'block';
+            
+            // Use setTimeout to prevent UI blocking
+            setTimeout(() => {
+                for (let lat = bounds.getSouth(); lat < bounds.getNorth() && analysisCount < maxAnalyses; lat += gridSize) {
+                    for (let lng = bounds.getWest(); lng < bounds.getEast() && analysisCount < maxAnalyses; lng += gridSize) {
+                        analysisCount++;
+                        
+                        const analysis = suitabilityAnalyzer.analyzeLocation(lat, lng, uploadedData);
+                        currentAnalysisResults.push(analysis);
+                        
+                        let color, className;
+                        const score = analysis.overallScore;
+                        
+                        if (score > 0.8) {
+                            color = '#27ae60';
+                            className = 'score-high';
+                        } else if (score > 0.6) {
+                            color = '#f39c12';
+                            className = 'score-medium';
+                        } else if (score > 0.4) {
+                            color = '#e67e22';
+                            className = 'score-medium';
+                        } else {
+                            color = '#e74c3c';
+                            className = 'score-low';
+                        }
+                        
+                        const rectangle = L.rectangle([
+                            [lat, lng],
+                            [lat + gridSize, lng + gridSize]
+                        ], {
+                            color: color,
+                            fillColor: color,
+                            fillOpacity: 0.6,
+                            weight: 1
+                        });
+                        
+                        rectangle.bindPopup(createDetailedAnalysisPopup(analysis));
+                        rectangle.addTo(layers.analysis);
+                    }
+                }
+                
+                // Sort results by score
+                currentAnalysisResults.sort((a, b) => b.overallScore - a.overallScore);
+                
+                // Display results
+                displayAnalysisResults();
+                
+            }, 100);
+        }
+
+        // Create detailed analysis popup
+        function createDetailedAnalysisPopup(analysis) {
+            const { overallScore, detailedScores, suitabilityLevel, riskFactors } = analysis;
+            
+            let popup = `
+                <div style="max-width: 300px;">
+                    <h4>📍 Detailed Site Analysis</h4>
+                    <p><strong>Location:</strong> ${analysis.coordinates.lat.toFixed(3)}, ${analysis.coordinates.lng.toFixed(3)}</p>
+                    <p><strong>Overall Score:</strong> <span class="score-indicator ${getSuitabilityClass(overallScore)}">${(overallScore * 100).toFixed(1)}%</span></p>
+                    <p><strong>Suitability:</strong> ${suitabilityLevel.level}</p>
+                    
+                    <h5>Factor Scores:</h5>
+                    <ul style="font-size: 12px;">
+                        <li>Power: ${(detailedScores.power.score * 100).toFixed(0)}%</li>
+                        <li>Connectivity: ${(detailedScores.connectivity.score * 100).toFixed(0)}%</li>
+                        <li>Cooling: ${(detailedScores.cooling.score * 100).toFixed(0)}%</li>
+                        <li>Water: ${(detailedScores.water.score * 100).toFixed(0)}%</li>
+                        <li>Transport: ${(detailedScores.transport.score * 100).toFixed(0)}%</li>
+                        <li>Geology: ${(detailedScores.geology.score * 100).toFixed(0)}%</li>
+                        <li>Security: ${(detailedScores.security.score * 100).toFixed(0)}%</li>
+                        <li>Regulatory: ${(detailedScores.regulations.score * 100).toFixed(0)}%</li>
+                    </ul>
+            `;
+            
+            if (riskFactors.length > 0) {
+                popup += `<h5>⚠️ Risk Factors:</h5><ul style="font-size: 11px;">`;
+                riskFactors.forEach(risk => {
+                    popup += `<li>${risk.factor}: ${risk.description}</li>`;
+                });
+                popup += '</ul>';
+            }
+            
+            popup += '</div>';
+            return popup;
+        }
+
+        // Display analysis results
+        function displayAnalysisResults() {
+            const resultsContent = document.getElementById('results-content');
+            const topSites = currentAnalysisResults.slice(0, 5);
+            
+            let html = `
+                <h4>✅ Analysis Complete!</h4>
+                <p><strong>Total Sites Analyzed:</strong> ${currentAnalysisResults.length}</p>
+                <p><strong>Grid Resolution:</strong> ${document.getElementById('grid-resolution').value}°</p>
+                
+                <h5>🏆 Top 5 Locations:</h5>
+                <ol>
+            `;
+            
+            topSites.forEach((site, index) => {
+                html += `
+                    <li>
+                        <strong>Score: ${(site.overallScore * 100).toFixed(1)}%</strong><br>
+                        <small>Lat: ${site.coordinates.lat.toFixed(3)}, Lng: ${site.coordinates.lng.toFixed(3)}</small><br>
+                        <small>${site.suitabilityLevel.level} - ${site.suitabilityLevel.description}</small>
+                    </li>
+                `;
+            });
+            
+            html += `
+                </ol>
+                <button class="btn" onclick="showTopSites()">📍 Highlight Top Sites</button>
+                <button class="btn" onclick="generateDetailedReport()">📊 Generate Report</button>
+            `;
+            
+            resultsContent.innerHTML = html;
+        }
+
+        // Find optimal locations
+        function findOptimalLocations() {
+            if (currentAnalysisResults.length === 0) {
+                alert('Please run the Advanced Suitability Analysis first!');
+                return;
+            }
+            
+            showTopSites();
+        }
+
+        // Show top sites on map
+        function showTopSites() {
+            const topSites = currentAnalysisResults.slice(0, 5);
+            
+            // Clear existing markers
+            layers.analysis.eachLayer(layer => {
+                if (layer.options && layer.options.isTopSite) {
+                    layers.analysis.removeLayer(layer);
+                }
+            });
+            
+            // Add markers for top sites
+            topSites.forEach((site, index) => {
+                const marker = L.marker([site.coordinates.lat, site.coordinates.lng], {
+                    isTopSite: true
+                }).addTo(layers.analysis);
+                
+                marker.bindPopup(`
+                    <h4>🏆 Rank #${index + 1} Site</h4>
+                    ${createDetailedAnalysisPopup(site)}
+                `);
+                
+                // Auto-open popup for #1 site
+                if (index === 0) {
+                    marker.openPopup();
+                }
+            });
+            
+            // Fit map to show top sites
+            if (topSites.length > 0) {
+                const group = new L.featureGroup(
+                    topSites.map(site => L.marker([site.coordinates.lat, site.coordinates.lng]))
+                );
+                map.fitBounds(group.getBounds().pad(0.1));
+            }
+        }
+
+        // Generate comparative report
+        function generateComparativeReport() {
+            if (currentAnalysisResults.length === 0) {
+                alert('Please run the Advanced Suitability Analysis first!');
+                return;
+            }
+            
+            const topSites = currentAnalysisResults.slice(0, 10);
+            let report = 'Data Center Location Analysis Report\\n';
+            report += '='.repeat(50) + '\\n\\n';
+            
+            report += `Analysis Summary:\\n`;
+            report += `- Total locations analyzed: ${currentAnalysisResults.length}\\n`;
+            report += `- Analysis date: ${new Date().toLocaleDateString()}\\n`;
+            report += `- Best overall score: ${(currentAnalysisResults[0].overallScore * 100).toFixed(1)}%\\n\\n`;
+            
+            report += 'Top 10 Recommended Locations:\\n';
+            report += '-'.repeat(40) + '\\n';
+            
+            topSites.forEach((site, index) => {
+                report += `${index + 1}. Location: ${site.coordinates.lat.toFixed(3)}, ${site.coordinates.lng.toFixed(3)}\\n`;
+                report += `   Overall Score: ${(site.overallScore * 100).toFixed(1)}%\\n`;
+                report += `   Level: ${site.suitabilityLevel.level}\\n`;
+                report += `   Key Strengths: `;
+                
+                // Find top 3 scoring factors
+                const factorScores = Object.entries(site.detailedScores)
+                    .map(([factor, data]) => ({ factor, score: data.score }))
+                    .sort((a, b) => b.score - a.score)
+                    .slice(0, 3);
+                
+                report += factorScores.map(f => `${f.factor} (${(f.score * 100).toFixed(0)}%)`).join(', ');
+                report += '\\n\\n';
+            });
+            
+            // Create downloadable report
+            const blob = new Blob([report], { type: 'text/plain' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `data-center-analysis-${new Date().toISOString().split('T')[0]}.txt`;
+            a.click();
+            window.URL.revokeObjectURL(url);
+            
+            alert('Comparative report generated and downloaded!');
+        }
+
+        // Perform risk assessment
+        function performRiskAssessment() {
+            if (currentAnalysisResults.length === 0) {
+                alert('Please run the Advanced Suitability Analysis first!');
+                return;
+            }
+            
+            const allRisks = [];
+            currentAnalysisResults.forEach(result => {
+                result.riskFactors.forEach(risk => {
+                    const existing = allRisks.find(r => r.factor === risk.factor);
+                    if (existing) {
+                        existing.count++;
+                    } else {
+                        allRisks.push({ ...risk, count: 1 });
+                    }
+                });
+            });
+            
+            // Sort by frequency
+            allRisks.sort((a, b) => b.count - a.count);
+            
+            let riskReport = 'Risk Assessment Summary\\n';
+            riskReport += '='.repeat(30) + '\\n\\n';
+            riskReport += 'Most Common Risk Factors:\\n';
+            
+            allRisks.slice(0, 10).forEach((risk, index) => {
+                const percentage = (risk.count / currentAnalysisResults.length * 100).toFixed(1);
+                riskReport += `${index + 1}. ${risk.factor} (${risk.severity} Risk)\\n`;
+                riskReport += `   Affects ${percentage}% of analyzed locations\\n`;
+                riskReport += `   Description: ${risk.description}\\n\\n`;
+            });
+            
+            alert(riskReport);
+        }
+
+        // Helper functions
+        function getSuitabilityClass(score) {
+            if (score > 0.8) return 'score-high';
+            if (score > 0.6) return 'score-medium';
+            return 'score-low';
+        }
+
+        function updateAnalysisWeights() {
+            const weights = {
+                power: parseFloat(document.getElementById('power-weight').value),
+                connectivity: parseFloat(document.getElementById('connectivity-weight').value),
+                cooling: parseFloat(document.getElementById('cooling-weight').value),
+                water: parseFloat(document.getElementById('water-weight').value),
+                transport: parseFloat(document.getElementById('transport-weight').value),
+                geology: parseFloat(document.getElementById('geology-weight').value),
+                security: parseFloat(document.getElementById('security-weight').value),
+                regulations: parseFloat(document.getElementById('regulatory-weight').value)
+            };
+            
+            suitabilityAnalyzer.updateWeights(weights);
+        }
+
+        function resetDefaultWeights() {
+            document.getElementById('power-weight').value = 0.25;
+            document.getElementById('connectivity-weight').value = 0.20;
+            document.getElementById('cooling-weight').value = 0.15;
+            document.getElementById('water-weight').value = 0.12;
+            document.getElementById('transport-weight').value = 0.10;
+            document.getElementById('geology-weight').value = 0.08;
+            document.getElementById('security-weight').value = 0.05;
+            document.getElementById('regulatory-weight').value = 0.05;
+            
+            updateWeightDisplays();
+        }
+
+        function updateWeightDisplays() {
+            document.getElementById('power-weight-value').textContent = (parseFloat(document.getElementById('power-weight').value) * 100).toFixed(0) + '%';
+            document.getElementById('connectivity-weight-value').textContent = (parseFloat(document.getElementById('connectivity-weight').value) * 100).toFixed(0) + '%';
+            document.getElementById('cooling-weight-value').textContent = (parseFloat(document.getElementById('cooling-weight').value) * 100).toFixed(0) + '%';
+            document.getElementById('water-weight-value').textContent = (parseFloat(document.getElementById('water-weight').value) * 100).toFixed(0) + '%';
+            document.getElementById('transport-weight-value').textContent = (parseFloat(document.getElementById('transport-weight').value) * 100).toFixed(0) + '%';
+            document.getElementById('geology-weight-value').textContent = (parseFloat(document.getElementById('geology-weight').value) * 100).toFixed(0) + '%';
+            document.getElementById('security-weight-value').textContent = (parseFloat(document.getElementById('security-weight').value) * 100).toFixed(0) + '%';
+            document.getElementById('regulatory-weight-value').textContent = (parseFloat(document.getElementById('regulatory-weight').value) * 100).toFixed(0) + '%';
+        }
+
+        function generateDetailedReport() {
+            if (currentAnalysisResults.length === 0) {
+                alert('No analysis results available!');
+                return;
+            }
+            
+            const topSite = currentAnalysisResults[0];
+            let report = `DETAILED SITE ANALYSIS REPORT\\n`;
+            report += `${'='.repeat(50)}\\n\\n`;
+            report += `Location: ${topSite.coordinates.lat.toFixed(4)}, ${topSite.coordinates.lng.toFixed(4)}\\n`;
+            report += `Overall Suitability Score: ${(topSite.overallScore * 100).toFixed(1)}%\\n`;
+            report += `Suitability Level: ${topSite.suitabilityLevel.level}\\n`;
+            report += `Assessment: ${topSite.suitabilityLevel.description}\\n\\n`;
+            
+            report += `DETAILED FACTOR ANALYSIS:\\n`;
+            report += `${'-'.repeat(30)}\\n`;
+            
+            Object.entries(topSite.detailedScores).forEach(([factor, data]) => {
+                report += `\\n${factor.toUpperCase()}:\\n`;
+                report += `Score: ${(data.score * 100).toFixed(1)}%\\n`;
+                report += `Factors:\\n`;
+                data.factors.forEach(f => report += `  • ${f}\\n`);
+                
+                if (data.details) {
+                    report += `Details:\\n`;
+                    Object.entries(data.details).forEach(([key, value]) => {
+                        report += `  ${key}: ${value}\\n`;
+                    });
+                }
+            });
+            
+            if (topSite.recommendations.length > 0) {
+                report += `\\nRECOMMENDATIONS:\\n`;
+                report += `${'-'.repeat(20)}\\n`;
+                topSite.recommendations.forEach((rec, index) => {
+                    report += `\\n${index + 1}. ${rec.category} (${rec.priority} Priority)\\n`;
+                    report += `   ${rec.recommendation}\\n`;
+                    report += `   Estimated Cost: ${rec.estimatedCost}\\n`;
+                });
+            }
+            
+            if (topSite.riskFactors.length > 0) {
+                report += `\\nRISK FACTORS:\\n`;
+                report += `${'-'.repeat(15)}\\n`;
+                topSite.riskFactors.forEach((risk, index) => {
+                    report += `\\n${index + 1}. ${risk.factor} (${risk.severity} Risk)\\n`;
+                    report += `   ${risk.description}\\n`;
+                });
+            }
+            
+            // Download report
+            const blob = new Blob([report], { type: 'text/plain' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `detailed-site-analysis-${new Date().toISOString().split('T')[0]}.txt`;
+            a.click();
+            window.URL.revokeObjectURL(url);
+        }
+
+        // Generate buffer zones
+        function generateBuffer() {
+            const radius = parseInt(document.getElementById('search-radius').value) * 1000; // Convert to meters
+            
+            // Create buffers around existing infrastructure
+            layers.analysis.clearLayers();
+            
+            layers.roads.eachLayer(layer => {
+                if (layer.getLatLng) {
+                    L.circle(layer.getLatLng(), {
+                        radius: radius,
+                        color: '#2980b9',
+                        fillOpacity: 0.1,
+                        weight: 1
+                    }).addTo(layers.analysis);
+                }
+            });
+            
+            alert(`Generated ${radius/1000}km proximity zones around infrastructure.`);
+        }
+
+        // Clear analysis
+        function clearAnalysis() {
+            layers.analysis.clearLayers();
+            document.getElementById('analysis-results').style.display = 'none';
+        }
+
+        // Update layer controls
+        function updateLayerControls() {
+            const layerTypes = ['roads', 'electricity', 'telecommunications', 'water', 'climate', 'geology'];
+            
+            layerTypes.forEach(type => {
+                const toggle = document.getElementById(`${type}-toggle`);
+                const opacity = document.getElementById(`${type}-opacity`);
+                
+                if (toggle) {
+                    toggle.addEventListener('change', function() {
+                        if (this.checked) {
+                            map.addLayer(layers[type]);
+                        } else {
+                            map.removeLayer(layers[type]);
+                        }
+                    });
+                }
+                
+                if (opacity) {
+                    opacity.addEventListener('input', function() {
+                        layers[type].eachLayer(layer => {
+                            if (layer.setStyle) {
+                                layer.setStyle({opacity: this.value, fillOpacity: this.value});
+                            }
+                        });
+                    });
+                }
+            });
+        }
+
+        // Weight sliders event listeners
+        function setupWeightSliders() {
+            const weightIds = [
+                'power-weight', 'connectivity-weight', 'cooling-weight', 'water-weight',
+                'transport-weight', 'geology-weight', 'security-weight', 'regulatory-weight'
+            ];
+            
+            weightIds.forEach(id => {
+                const slider = document.getElementById(id);
+                if (slider) {
+                    slider.addEventListener('input', function() {
+                        updateWeightDisplays();
+                    });
+                }
+            });
+            
+            // Search radius slider
+            const radiusSlider = document.getElementById('search-radius');
+            if (radiusSlider) {
+                radiusSlider.addEventListener('input', function() {
+                    document.getElementById('radius-value').textContent = this.value;
+                });
+            }
+        }
+
+        // Initialize file uploads
+        function initializeFileUploads() {
+            const fileTypes = ['roads', 'electricity', 'telecom', 'water', 'climate', 'geology'];
+            
+            fileTypes.forEach(type => {
+                const layerType = type === 'telecom' ? 'telecommunications' : type;
+                setupFileUpload(`${type}-file`, layerType);
+            });
+        }
+
+        // Initialize drag and drop
+        function initializeDragAndDrop() {
+            const fileInputs = ['roads-file', 'electricity-file', 'telecom-file', 'water-file', 'climate-file', 'geology-file'];
+            
+            fileInputs.forEach(fileId => {
+                const fileInput = document.getElementById(fileId);
+                if (fileInput) {
+                    const uploadArea = fileInput.parentElement;
+                    
+                    uploadArea.addEventListener('dragover', function(e) {
+                        e.preventDefault();
+                        this.classList.add('dragover');
+                    });
+
+                    uploadArea.addEventListener('dragleave', function(e) {
+                        e.preventDefault();
+                        this.classList.remove('dragover');
+                    });
+
+                    uploadArea.addEventListener('drop', function(e) {
+                        e.preventDefault();
+                        this.classList.remove('dragover');
+                        const files = e.dataTransfer.files;
+                        if (files.length > 0) {
+                            const layerType = fileId.split('-')[0];
+                            const mappedType = layerType === 'telecom' ? 'telecommunications' : layerType;
+                            processFile(files[0], mappedType);
+                        }
+                    });
+                }
+            });
+        }
+
+        // Initialize everything
+        function initialize() {
+            updateLayerControls();
+            setupWeightSliders();
+            initializeFileUploads();
+            initializeDragAndDrop();
+            updateWeightDisplays();
+            
+            // Add click handler for location analysis
+            map.on('click', function(e) {
+                if (Object.values(uploadedData).some(data => data)) {
+                    const analysis = suitabilityAnalyzer.analyzeLocation(e.latlng.lat, e.latlng.lng, uploadedData);
+                    
+                    const popup = L.popup()
+                        .setLatLng(e.latlng)
+                        .setContent(createDetailedAnalysisPopup(analysis))
+                        .openOn(map);
+                }
+            });
+        }
+
+        // Initialize when page loads
+        initialize();
+    </script>
+</body>
+</html>
