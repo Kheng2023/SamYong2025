@@ -14,6 +14,18 @@ services:
 #    command: ["--config", "/config/config.json", "--verbose"]
 #    restart: unless-stopped
 
+  # Map Baker service
+  map_baker:
+    build:
+      context: .
+      dockerfile: Dockerfile.map_baker
+    container_name: map-baker
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./geojsons:/app/geojsons
+    restart: unless-stopped
+
   # Streamlit frontend application
   frontend:
     build:
@@ -23,7 +35,7 @@ services:
     ports:
       - "8501:8501"
     volumes:
-      - .:/app
+      - ./:/app
       - ./map_data:/app/map_data
       - ./output:/app/output
 #    depends_on:
