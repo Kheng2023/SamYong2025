@@ -1,0 +1,26 @@
+{
+  "version": 8,
+  "name": "AU Minimal Debug",
+  "glyphs": "/fonts/{fontstack}/{range}.pbf",
+  "sources": {
+    "openmaptiles": {
+      "type": "vector",
+      "url": "mbtiles://openmaptiles.json"
+    }
+  },
+  "layers": [
+    { "id": "bg", "type": "background",
+      "paint": { "background-color": "#e9e6d8" } },
+
+    { "id": "water", "type": "fill",
+      "source": "openmaptiles",
+      "source-layer": "water",
+      "paint": { "fill-color": "#a0c8f0" } },
+
+    { "id": "places",
+      "type": "symbol",
+      "source": "openmaptiles",
+      "source-layer": "place",
+      "layout": { "text-field": ["get", "name"], "text-size": 12 } }
+  ]
+}

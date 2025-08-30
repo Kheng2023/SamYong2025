@@ -9,9 +9,11 @@ services:
       - "8080:8080"
     volumes:
       - ./map_data:/data
-      - ./tileserver_config:/config
+      - ./tileserver_config/config.json:/config/config.json
+      - ./tileserver_config/styles:/config/styles
     environment:
       - CORS_ORIGINS=*
+    command: ["--config", "/config/config.json", "--verbose"]
     restart: unless-stopped
 
   # Streamlit frontend application

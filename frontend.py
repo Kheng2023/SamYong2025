@@ -2,6 +2,7 @@ import streamlit as st
 import numpy as np
 import pandas as pd
 import pydeck as pdk
+from pydeck.bindings.base_map_provider import BaseMapProvider
 import json
 # Add these imports for tile server integration
 import requests
@@ -175,59 +176,37 @@ if mode == "ABS GPKG map":
     with st.expander("Data preview"):
         st.dataframe(gdf.drop(columns=[gdf.geometry.name], errors="ignore").head(1000))
 elif mode == "Tile Server Map":
-    st.subheader("Map Data from Tile Server")
+        st.subheader("Map Data from Tile Server")
 
-    # Define the tile server URL
-    tile_server_url = "http://tileserver:8080"
+        tile_server_public = st.sidebar.text_input(
+            "Tile server URL (browser-accessible)",
+            value="http://localhost:8080",
+        )
 
-    # Check if tile server is available
-    try:
-        response = requests.get(f"{tile_server_url}/styles/basic.json")
-        if response.status_code == 200:
-            st.success("Connected to tile server successfully!")
-        else:
-            st.error(f"Tile server returned status code: {response.status_code}")
-    except requests.exceptions.ConnectionError:
-        st.error("Could not connect to tile server. Make sure it's running.")
-        st.info("If running in Docker, use 'http://tileserver:8080' instead of localhost.")
+        style_url = f"{tile_server_public}/styles/basic/style.json"  # STYLE JSON
 
-    # Create a MapLibre map
-    map_style = {
-        "version": 8,
-        "sources": {
-            "tiles": {
-                "type": "raster",
-                "tiles": [f"{tile_server_url}/styles/basic/{{z}}/{{x}}/{{y}}.png"],
-                "tileSize": 256,
-                "attribution": "© Map Data"
-            }
-        },
-        "layers": [
-            {
-                "id": "tiles",
-                "type": "raster",
-                "source": "tiles",
-                "minzoom": 0,
-                "maxzoom": 22
-            }
-        ]
-    }
+        # Center on Zurich (your current demo tiles only cover Zurich)
+        view_state = pdk.ViewState(latitude=47.3769, longitude=8.5417, zoom=11)
 
-    # Display the map
-    st_maplibre(
-        map_style=map_style,
-        height=600,
-        center=[-25.5, 134.5],  # Center on Australia
-        zoom=4
-    )
+        # Add a tiny marker so we know WebGL is rendering even if basemap fails
+        sanity_layer = pdk.Layer(
+            "ScatterplotLayer",
+            data=[{"lon": 8.5417, "lat": 47.3769}],
+            get_position=["lon", "lat"],
+            get_radius=200,
+            pickable=True,
+        )
 
-    # Add layer toggles
-    st.sidebar.subheader("Map Layers")
-    show_transmission = st.sidebar.checkbox("Show Transmission Lines", value=True)
-    show_stations = st.sidebar.checkbox("Show Power Stations", value=True)
-    show_substations = st.sidebar.checkbox("Show Substations", value=True)
+        r = pdk.Deck(
+            layers=[sanity_layer],
+            map_style=style_url,
+            initial_view_state=view_state,
+            height=650,
+            map_provider=None,  # don’t force Mapbox with a custom style
+        )
 
-    # In a real implementation, these toggles would update the map layers
+        st.pydeck_chart(r, use_container_width=True)
+
 
 else:
     # --- Dummy heatmap mode (existing MVP) ---

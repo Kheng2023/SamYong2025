@@ -1,34 +1,18 @@
 {
-  "options": {
-    "paths": {
-      "root": "/data",
-      "fonts": "fonts",
-      "styles": "styles",
-      "mbtiles": ""
+  "paths": {
+    "root": "",
+    "fonts": "fonts",
+    "sprites": "sprites",
+    "icons": "icons",
+    "styles": "styles",
+    "mbtiles": "data",
+    "pmtiles": "data",
+    "files": "files"
     },
-    "serveAllFonts": true,
-    "formatQuality": {
-      "jpeg": 80,
-      "webp": 90
-    }
+  "data": {
+    "openmaptiles": { "mbtiles": "/data/australia.mbtiles" }
   },
   "styles": {
-    "basic": {
-      "style": "styles/basic.json",
-      "tilejson": {
-        "bounds": [112.9, -43.7, 153.6, -10.6]  // Australia bounds
-      }
-    }
-  },
-  "data": {
-    "transmission_lines": {
-      "mbtiles": "Electricity_Transmission_Lines.geojson"
-    },
-    "power_stations": {
-      "mbtiles": "Major_Power_Stations.geojson"
-    },
-    "substations": {
-      "mbtiles": "Transmission_Substations.geojson"
-    }
+    "basic": { "style": "styles/debug.json" }
   }
 }
