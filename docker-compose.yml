@@ -1,20 +1,18 @@
-version: '3'
-
 services:
   # Tile server for serving map tiles
-  tileserver:
-    image: maptiler/tileserver-gl
-    container_name: map-tileserver
-    ports:
-      - "8080:8080"
-    volumes:
-      - ./map_data:/data
-      - ./tileserver_config/config.json:/config/config.json
-      - ./tileserver_config/styles:/config/styles
-    environment:
-      - CORS_ORIGINS=*
-    command: ["--config", "/config/config.json", "--verbose"]
-    restart: unless-stopped
+#  tileserver:
+#    image: maptiler/tileserver-gl
+#    container_name: map-tileserver
+#    ports:
+#      - "8080:8080"
+#    volumes:
+#      - ./map_data:/data
+#      - ./tileserver_config/config.json:/config/config.json
+#      - ./tileserver_config/styles:/config/styles
+#    environment:
+#      - CORS_ORIGINS=*
+#    command: ["--config", "/config/config.json", "--verbose"]
+#    restart: unless-stopped
 
   # Streamlit frontend application
   frontend:
@@ -26,6 +24,8 @@ services:
       - "8501:8501"
     volumes:
       - .:/app
-    depends_on:
-      - tileserver
+      - ./map_data:/app/map_data
+      - ./output:/app/output
+#    depends_on:
+#      - tileserver
     restart: unless-stopped
