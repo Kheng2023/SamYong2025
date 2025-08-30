@@ -1,0 +1,29 @@
+version: '3'
+
+services:
+  # Tile server for serving map tiles
+  tileserver:
+    image: maptiler/tileserver-gl
+    container_name: map-tileserver
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./map_data:/data
+      - ./tileserver_config:/config
+    environment:
+      - CORS_ORIGINS=*
+    restart: unless-stopped
+
+  # Streamlit frontend application
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: map-frontend
+    ports:
+      - "8501:8501"
+    volumes:
+      - .:/app
+    depends_on:
+      - tileserver
+    restart: unless-stopped

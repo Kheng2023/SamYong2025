@@ -8,6 +8,7 @@ numpy==2.3.2
 pandas==2.3.2
 pydeck==0.9.1
 requests==2.32.5
+maplibre==0.3.5
 
 # Geospatial stack
 # geopandas depends on shapely and either pyogrio or fiona/GDAL for IO.
@@ -15,5 +16,4 @@ requests==2.32.5
 geopandas==1.1.1
 shapely==2.1.1
 pyogrio==0.11.1
-fiona==1.10.1
-
+fiona==1.9.6

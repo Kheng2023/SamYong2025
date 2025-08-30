@@ -1,0 +1,59 @@
+{
+  "version": 8,
+  "name": "Basic",
+  "center": [134.5, -25.5],
+  "zoom": 4,
+  "sources": {
+    "transmission_lines": {
+      "type": "vector",
+      "url": "mbtiles://transmission_lines"
+    },
+    "power_stations": {
+      "type": "vector",
+      "url": "mbtiles://power_stations"
+    },
+    "substations": {
+      "type": "vector",
+      "url": "mbtiles://substations"
+    }
+  },
+  "layers": [
+    {
+      "id": "background",
+      "type": "background",
+      "paint": {
+        "background-color": "#f8f4f0"
+      }
+    },
+    {
+      "id": "transmission_lines",
+      "type": "line",
+      "source": "transmission_lines",
+      "source-layer": "Electricity_Transmission_Lines",
+      "paint": {
+        "line-color": "#0066FF",
+        "line-width": 1.5
+      }
+    },
+    {
+      "id": "power_stations",
+      "type": "circle",
+      "source": "power_stations",
+      "source-layer": "Major_Power_Stations",
+      "paint": {
+        "circle-radius": 5,
+        "circle-color": "#FF6600"
+      }
+    },
+    {
+      "id": "substations",
+      "type": "circle",
+      "source": "substations",
+      "source-layer": "Transmission_Substations",
+      "paint": {
+        "circle-radius": 3,
+        "circle-color": "#33CC33"
+      }
+    }
+  ]
+}

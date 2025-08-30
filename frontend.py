@@ -3,18 +3,20 @@ import numpy as np
 import pandas as pd
 import pydeck as pdk
 import json
+# Add these imports for tile server integration
+import requests
 
 st.set_page_config(page_title="AI Data Centre Heatmap MVP", layout="wide")
 
 st.title("🇦🇺 Data Centres: Heatmap MVP")
 
-mode = st.sidebar.selectbox("View", ["Dummy heatmap", "ABS GPKG map"]) 
+mode = st.sidebar.selectbox("View", ["Dummy heatmap", "ABS GPKG map", "Tile Server Map"]) 
 
 if mode == "ABS GPKG map":
     # Lazy-import geopandas to avoid heavy deps when not needed
     import geopandas as gpd
 
-    GPKG_PATH = r"C:\\Users\\User\\PythonProjects\\Govhack2025-Datacetnres\\abs_population_data\\32180_ERP_2024_SA2_GDA2020.gpkg"
+    GPKG_PATH = r"abs_population_data/32180_ERP_2024_SA2_GDA2020.gpkg"
 
     st.sidebar.write("GeoPackage settings")
     engine = st.sidebar.selectbox("Read engine", options=["pyogrio", "fiona"], index=0)
@@ -172,6 +174,61 @@ if mode == "ABS GPKG map":
 
     with st.expander("Data preview"):
         st.dataframe(gdf.drop(columns=[gdf.geometry.name], errors="ignore").head(1000))
+elif mode == "Tile Server Map":
+    st.subheader("Map Data from Tile Server")
+
+    # Define the tile server URL
+    tile_server_url = "http://tileserver:8080"
+
+    # Check if tile server is available
+    try:
+        response = requests.get(f"{tile_server_url}/styles/basic.json")
+        if response.status_code == 200:
+            st.success("Connected to tile server successfully!")
+        else:
+            st.error(f"Tile server returned status code: {response.status_code}")
+    except requests.exceptions.ConnectionError:
+        st.error("Could not connect to tile server. Make sure it's running.")
+        st.info("If running in Docker, use 'http://tileserver:8080' instead of localhost.")
+
+    # Create a MapLibre map
+    map_style = {
+        "version": 8,
+        "sources": {
+            "tiles": {
+                "type": "raster",
+                "tiles": [f"{tile_server_url}/styles/basic/{{z}}/{{x}}/{{y}}.png"],
+                "tileSize": 256,
+                "attribution": "© Map Data"
+            }
+        },
+        "layers": [
+            {
+                "id": "tiles",
+                "type": "raster",
+                "source": "tiles",
+                "minzoom": 0,
+                "maxzoom": 22
+            }
+        ]
+    }
+
+    # Display the map
+    st_maplibre(
+        map_style=map_style,
+        height=600,
+        center=[-25.5, 134.5],  # Center on Australia
+        zoom=4
+    )
+
+    # Add layer toggles
+    st.sidebar.subheader("Map Layers")
+    show_transmission = st.sidebar.checkbox("Show Transmission Lines", value=True)
+    show_stations = st.sidebar.checkbox("Show Power Stations", value=True)
+    show_substations = st.sidebar.checkbox("Show Substations", value=True)
+
+    # In a real implementation, these toggles would update the map layers
+
 else:
     # --- Dummy heatmap mode (existing MVP) ---
     GRID_SIZE = 50
