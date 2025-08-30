@@ -645,14 +645,15 @@
                     if (name.includes('_processed_heatmap')) {
                         const value = feature.properties.value || 0;
                         const maxValue = Math.max(...geojsonData.features.map(f => f.properties.value || 0));
-                        const opacity = value / maxValue;
+                        const normalizedValue = value / maxValue;
+                        const gradientColor = getColorFromGradient(normalizedValue);
 
                         return {
-                            color: color,
+                            color: '#000',  // Black border
                             weight: 1,
                             opacity: 1,
-                            fillOpacity: Math.max(0.3, opacity),
-                            fillColor: color
+                            fillOpacity: Math.max(0.3, normalizedValue * 0.7 + 0.3),  // Min opacity 0.3, max 1.0
+                            fillColor: gradientColor
                         };
                     }
 
@@ -668,11 +669,13 @@
                     if (name.includes('_processed_heatmap')) {
                         const value = feature.properties.value || 0;
                         const maxValue = Math.max(...geojsonData.features.map(f => f.properties.value || 0));
-                        const radius = Math.max(3, (value / maxValue) * 15);
+                        const normalizedValue = value / maxValue;
+                        const radius = Math.max(3, normalizedValue * 15);
+                        const gradientColor = getColorFromGradient(normalizedValue);
 
                         return L.circleMarker(latlng, {
                             radius: radius,
-                            fillColor: color,
+                            fillColor: gradientColor,
                             color: '#000',
                             weight: 1,
                             opacity: 1,
@@ -726,7 +729,6 @@
                         <div class="layer-control">
                             <input type="checkbox" id="layer-${name}" checked>
                             <label for="layer-${name}" title="${name}">${displayName}</label>
-                            <input type="color" class="color-picker" data-layer="${name}" value="${layerInfo.color}">
                             <button class="remove-layer" data-layer="${name}">×</button>
                             <input type="checkbox" class="aggregate-select" id="aggregate-${name}" data-layer="${name}">
                             <label for="aggregate-${name}" title="Select for aggregation" class="aggregate-label">Agg</label>
@@ -740,10 +742,6 @@
             // Add event listeners
             document.querySelectorAll('input[type="checkbox"][id^="layer-"]').forEach(checkbox => {
                 checkbox.addEventListener('change', toggleLayerVisibility);
-            });
-
-            document.querySelectorAll('.color-picker').forEach(picker => {
-                picker.addEventListener('change', changeLayerColor);
             });
 
             document.querySelectorAll('.remove-layer').forEach(button => {
@@ -762,26 +760,6 @@
                 } else {
                     map.removeLayer(layer);
                 }
-            }
-        }
-
-        // Change layer color
-        function changeLayerColor(event) {
-            const layerName = event.target.dataset.layer;
-            const newColor = event.target.value;
-            const layerInfo = activeLayers[layerName];
-
-            if (layerInfo) {
-                layerInfo.color = newColor;
-
-                // Remove and re-add layer with new color - this is simplified
-                // In a production app, you'd want to update the layer style without re-adding
-                map.removeLayer(layerInfo.layer);
-
-                // For processed layers, we'd need to store the GeoJSON data
-                // This is a simplified version
-                console.log(`Color changed for ${layerName} to ${newColor}`);
-                // Re-adding would require stored geojsonData
             }
         }
 
@@ -805,6 +783,53 @@
                 color += letters[Math.floor(Math.random() * 16)];
             }
             return color;
+        }
+
+        // Generate color from gradient based on value (0-1)
+        function getColorFromGradient(value) {
+            // Define gradient colors (from blue to red)
+            const colors = [
+                {value: 0, color: [0, 0, 255]},    // Blue for low values
+                {value: 0.5, color: [0, 255, 0]},  // Green for medium values
+                {value: 1, color: [255, 0, 0]}     // Red for high values
+            ];
+
+            // Find the two colors to interpolate between
+            let colorA, colorB, valueA, valueB;
+            for (let i = 0; i < colors.length - 1; i++) {
+                if (value >= colors[i].value && value <= colors[i+1].value) {
+                    colorA = colors[i].color;
+                    colorB = colors[i+1].color;
+                    valueA = colors[i].value;
+                    valueB = colors[i+1].value;
+                    break;
+                }
+            }
+
+            // If value is outside the range, use the extremes
+            if (!colorA) {
+                if (value <= colors[0].value) {
+                    return rgbToHex(colors[0].color);
+                } else {
+                    return rgbToHex(colors[colors.length-1].color);
+                }
+            }
+
+            // Interpolate between the two colors
+            const normalizedValue = (value - valueA) / (valueB - valueA);
+            const r = Math.round(colorA[0] + normalizedValue * (colorB[0] - colorA[0]));
+            const g = Math.round(colorA[1] + normalizedValue * (colorB[1] - colorA[1]));
+            const b = Math.round(colorA[2] + normalizedValue * (colorB[2] - colorA[2]));
+
+            return rgbToHex([r, g, b]);
+        }
+
+        // Convert RGB array to hex color
+        function rgbToHex(rgb) {
+            return '#' + rgb.map(x => {
+                const hex = x.toString(16);
+                return hex.length === 1 ? '0' + hex : hex;
+            }).join('');
         }
 
         // Aggregate selected layers

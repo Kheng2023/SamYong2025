@@ -205,25 +205,6 @@ class GeoJSONProcessor:
 
         return df
 
-    def save_heatmap_csv(self, heatmap_df: pd.DataFrame, output_path: str) -> str:
-        """
-        Save a heatmap DataFrame to a CSV file.
-
-        Args:
-            heatmap_df (pd.DataFrame): DataFrame with lat, lon, and value columns.
-            output_path (str): Path where the CSV file will be saved.
-
-        Returns:
-            str: Path to the saved file.
-        """
-        # Ensure the directory exists
-        os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
-
-        # Save to CSV
-        heatmap_df.to_csv(output_path, index=False)
-
-        return output_path
-
     def save_heatmap_geojson(self, heatmap_df: pd.DataFrame, output_path: str) -> str:
         """
         Save a heatmap DataFrame to a GeoJSON file.
