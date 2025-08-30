@@ -157,67 +157,67 @@
             <h2>Active Layers</h2>
             <ul id="layer-list"></ul>
 
-            <!-- Aggregate Layers Section -->
-            <div class="aggregate-section">
-                <h2>🔄 Aggregate Layers</h2>
-                <div class="process-controls">
-                    <label for="aggregate-grid-size">Grid Size:</label>
-                    <input type="number" id="aggregate-grid-size" value="50" min="10" max="200">
+<!--            &lt;!&ndash; Aggregate Layers Section &ndash;&gt;-->
+<!--            <div class="aggregate-section">-->
+<!--                <h2>🔄 Aggregate Layers</h2>-->
+<!--                <div class="process-controls">-->
+<!--                    <label for="aggregate-grid-size">Grid Size:</label>-->
+<!--                    <input type="number" id="aggregate-grid-size" value="50" min="10" max="200">-->
 
-                    <p>Select layers for aggregation by checking the "Agg" checkbox next to each layer above.</p>
-                </div>
+<!--                    <p>Select layers for aggregation by checking the "Agg" checkbox next to each layer above.</p>-->
+<!--                </div>-->
 
-                <button class="process-button" id="aggregate-layers-btn" onclick="aggregateLayers()">
-                    Aggregate Selected Layers
-                </button>
+<!--                <button class="process-button" id="aggregate-layers-btn" onclick="aggregateLayers()">-->
+<!--                    Aggregate Selected Layers-->
+<!--                </button>-->
 
-                <div class="process-loading" id="aggregate-loading" style="display: none;">
-                    Aggregating layers...
-                </div>
+<!--                <div class="process-loading" id="aggregate-loading" style="display: none;">-->
+<!--                    Aggregating layers...-->
+<!--                </div>-->
 
-                <div class="process-info">
-                    <strong>Info:</strong> This will combine selected layers into a single heatmap, with each layer contributing to the final result.
-                </div>
-            </div>
+<!--                <div class="process-info">-->
+<!--                    <strong>Info:</strong> This will combine selected layers into a single heatmap, with each layer contributing to the final result.-->
+<!--                </div>-->
+<!--            </div>-->
 
-            <!-- Process Section -->
-            <div class="process-section">
-                <h2>🔧 Process GeoJSON</h2>
-                <div class="process-controls">
-                    <label for="process-file">Select File to Process:</label>
-                    <select id="process-file">
-                        <option value="">Choose a file...</option>
-                    </select>
+<!--            &lt;!&ndash; Process Section &ndash;&gt;-->
+<!--            <div class="process-section">-->
+<!--                <h2>🔧 Process GeoJSON</h2>-->
+<!--                <div class="process-controls">-->
+<!--                    <label for="process-file">Select File to Process:</label>-->
+<!--                    <select id="process-file">-->
+<!--                        <option value="">Choose a file...</option>-->
+<!--                    </select>-->
 
-                    <label for="process-grid-size">Grid Size:</label>
-                    <input type="number" id="process-grid-size" value="50" min="10" max="200">
+<!--                    <label for="process-grid-size">Grid Size:</label>-->
+<!--                    <input type="number" id="process-grid-size" value="50" min="10" max="200">-->
 
-                    <label for="process-weight-property">Weight Property (optional):</label>
-                    <select id="process-weight-property">
-                        <option value="">Choose a property...</option>
-                    </select>
+<!--                    <label for="process-weight-property">Weight Property (optional):</label>-->
+<!--                    <select id="process-weight-property">-->
+<!--                        <option value="">Choose a property...</option>-->
+<!--                    </select>-->
 
-                    <label for="process-filter-property">Filter Property (optional):</label>
-                    <select id="process-filter-property">
-                        <option value="">Choose a property...</option>
-                    </select>
+<!--                    <label for="process-filter-property">Filter Property (optional):</label>-->
+<!--                    <select id="process-filter-property">-->
+<!--                        <option value="">Choose a property...</option>-->
+<!--                    </select>-->
 
-                    <label for="process-filter-value">Filter Value:</label>
-                    <input type="text" id="process-filter-value" placeholder="Enter filter value...">
-                </div>
+<!--                    <label for="process-filter-value">Filter Value:</label>-->
+<!--                    <input type="text" id="process-filter-value" placeholder="Enter filter value...">-->
+<!--                </div>-->
 
-                <button class="process-button" id="process-geojson-btn" onclick="processGeoJSON()">
-                    Process & Generate Heatmap
-                </button>
+<!--                <button class="process-button" id="process-geojson-btn" onclick="processGeoJSON()">-->
+<!--                    Process & Generate Heatmap-->
+<!--                </button>-->
 
-                <div class="process-loading" id="process-loading">
-                    Processing GeoJSON file...
-                </div>
+<!--                <div class="process-loading" id="process-loading">-->
+<!--                    Processing GeoJSON file...-->
+<!--                </div>-->
 
-                <div class="process-info">
-                    <strong>Info:</strong> This will generate a grid-based heatmap from the selected GeoJSON file using the backend processor.
-                </div>
-            </div>
+<!--                <div class="process-info">-->
+<!--                    <strong>Info:</strong> This will generate a grid-based heatmap from the selected GeoJSON file using the backend processor.-->
+<!--                </div>-->
+<!--            </div>-->
 
             <!-- Build Layer Section -->
             <div class="process-section" style="background-color: #f8f0e8; border-color: #e6c3c3;">
@@ -295,37 +295,37 @@
                 </div>
             </div>
 
-            <!-- Build Multi-Layer Section -->
-            <div class="process-section" style="background-color: #e8f0ff; border-color: #b3c6e6;">
-                <h2>🔄 Build Multi-Layer</h2>
-                <div class="process-controls">
-                    <div id="multi-layer-list">
-                        <!-- Layer configurations will be added here -->
-                    </div>
+<!--            &lt;!&ndash; Build Multi-Layer Section &ndash;&gt;-->
+<!--            <div class="process-section" style="background-color: #e8f0ff; border-color: #b3c6e6;">-->
+<!--                <h2>🔄 Build Multi-Layer</h2>-->
+<!--                <div class="process-controls">-->
+<!--                    <div id="multi-layer-list">-->
+<!--                        &lt;!&ndash; Layer configurations will be added here &ndash;&gt;-->
+<!--                    </div>-->
 
-                    <button type="button" id="add-layer-btn" onclick="addLayerConfig()" style="background-color: #3498db; color: white; padding: 8px 16px; border: none; border-radius: 4px; margin: 10px 0; cursor: pointer;">
-                        + Add Layer
-                    </button>
+<!--                    <button type="button" id="add-layer-btn" onclick="addLayerConfig()" style="background-color: #3498db; color: white; padding: 8px 16px; border: none; border-radius: 4px; margin: 10px 0; cursor: pointer;">-->
+<!--                        + Add Layer-->
+<!--                    </button>-->
 
-                    <label for="multi-grid-size">Grid Size:</label>
-                    <input type="number" id="multi-grid-size" value="50" min="10" max="200">
+<!--                    <label for="multi-grid-size">Grid Size:</label>-->
+<!--                    <input type="number" id="multi-grid-size" value="50" min="10" max="200">-->
 
-                    <label for="multi-output-filename">Output Filename:</label>
-                    <input type="text" id="multi-output-filename" value="multi_layer.geojson">
-                </div>
+<!--                    <label for="multi-output-filename">Output Filename:</label>-->
+<!--                    <input type="text" id="multi-output-filename" value="multi_layer.geojson">-->
+<!--                </div>-->
 
-                <button class="process-button" id="build-multi-layer-btn" onclick="buildMultiLayer()" style="background-color: #2980b9;">
-                    Build Multi-Layer
-                </button>
+<!--                <button class="process-button" id="build-multi-layer-btn" onclick="buildMultiLayer()" style="background-color: #2980b9;">-->
+<!--                    Build Multi-Layer-->
+<!--                </button>-->
 
-                <div class="process-loading" id="multi-build-loading" style="display: none; color: #2980b9;">
-                    Building multi-layer...
-                </div>
+<!--                <div class="process-loading" id="multi-build-loading" style="display: none; color: #2980b9;">-->
+<!--                    Building multi-layer...-->
+<!--                </div>-->
 
-                <div class="process-info" style="background-color: #d4e6f9; border-color: #b3c6e6; color: #1a5276;">
-                    <strong>Info:</strong> This will build and combine multiple layers using the advanced engine functionality.
-                </div>
-            </div>
+<!--                <div class="process-info" style="background-color: #d4e6f9; border-color: #b3c6e6; color: #1a5276;">-->
+<!--                    <strong>Info:</strong> This will build and combine multiple layers using the advanced engine functionality.-->
+<!--                </div>-->
+<!--            </div>-->
         </div>
         <div class="map-container">
             <div id="map"></div>
@@ -406,29 +406,45 @@
             const fileSelect = document.getElementById('process-file');
             const buildSourceSelect = document.getElementById('build-source-id');
 
-            // Clear existing options
-            fileSelect.innerHTML = '<option value="">Choose a file...</option>';
-            buildSourceSelect.innerHTML = '<option value="">Choose a file...</option>';
+            // Check if elements exist before setting innerHTML
+            if (fileSelect) {
+                fileSelect.innerHTML = '<option value="">Choose a file...</option>';
+            }
+
+            if (buildSourceSelect) {
+                buildSourceSelect.innerHTML = '<option value="">Choose a file...</option>';
+            }
 
             // Add file options
             availableFiles.forEach(file => {
                 const optionHtml = `<option value="${file.path}" data-dir="${file.directory}" data-name="${file.name}">${file.name} (${file.directory})</option>`;
-                fileSelect.innerHTML += optionHtml;
-                buildSourceSelect.innerHTML += optionHtml;
+                if (fileSelect) {
+                    fileSelect.innerHTML += optionHtml;
+                }
+                if (buildSourceSelect) {
+                    buildSourceSelect.innerHTML += optionHtml;
+                }
             });
 
             // Add event listener for file selection
-            fileSelect.onchange = function() {
-                updateProcessPropertyOptions(this.value, this.options[this.selectedIndex]);
-            };
+            if (fileSelect) {
+                fileSelect.onchange = function() {
+                    updateProcessPropertyOptions(this.value, this.options[this.selectedIndex]);
+                };
+            }
 
             // Add event listener for build source selection
-            buildSourceSelect.onchange = function() {
-                updateBuildPropertyOptions(this.value, this.options[this.selectedIndex]);
-            };
+            if (buildSourceSelect) {
+                buildSourceSelect.onchange = function() {
+                    updateBuildPropertyOptions(this.value, this.options[this.selectedIndex]);
+                };
+            }
 
             // Initialize decay parameters
             updateDecayParams();
+
+            // Initialize mode options
+            updateBuildModeOptions();
         }
 
         // Update property options for processing
@@ -436,11 +452,16 @@
             const weightSelect = document.getElementById('process-weight-property');
             const filterSelect = document.getElementById('process-filter-property');
 
-            // Clear existing options
-            weightSelect.innerHTML = '<option value="">Choose a property...</option>';
-            filterSelect.innerHTML = '<option value="">Choose a property...</option>';
+            // Check if elements exist before setting innerHTML
+            if (weightSelect) {
+                weightSelect.innerHTML = '<option value="">Choose a property...</option>';
+            }
 
-            if (filePath && selectedOption) {
+            if (filterSelect) {
+                filterSelect.innerHTML = '<option value="">Choose a property...</option>';
+            }
+
+            if (filePath && selectedOption && weightSelect && filterSelect) {
                 try {
                     const directory = selectedOption.dataset.dir;
                     const filename = selectedOption.dataset.name;
@@ -484,11 +505,23 @@
 
         // Process GeoJSON function
         async function processGeoJSON() {
-            const filePath = document.getElementById('process-file').value;
-            const gridSize = parseInt(document.getElementById('process-grid-size').value);
-            const weightProperty = document.getElementById('process-weight-property').value || null;
-            const filterProperty = document.getElementById('process-filter-property').value;
-            const filterValue = document.getElementById('process-filter-value').value;
+            const filePathElement = document.getElementById('process-file');
+            const gridSizeElement = document.getElementById('process-grid-size');
+            const weightPropertyElement = document.getElementById('process-weight-property');
+            const filterPropertyElement = document.getElementById('process-filter-property');
+            const filterValueElement = document.getElementById('process-filter-value');
+
+            // Check if required elements exist
+            if (!filePathElement || !gridSizeElement) {
+                console.error('Required process elements not found in DOM');
+                return;
+            }
+
+            const filePath = filePathElement.value;
+            const gridSize = parseInt(gridSizeElement.value);
+            const weightProperty = weightPropertyElement ? weightPropertyElement.value || null : null;
+            const filterProperty = filterPropertyElement ? filterPropertyElement.value : null;
+            const filterValue = filterValueElement ? filterValueElement.value : null;
 
             if (!filePath) {
                 alert('Please select a file to process.');
@@ -498,8 +531,14 @@
             // Show loading indicator
             const loadingIndicator = document.getElementById('process-loading');
             const button = document.getElementById('process-geojson-btn');
-            loadingIndicator.style.display = 'block';
-            button.disabled = true;
+
+            if (loadingIndicator) {
+                loadingIndicator.style.display = 'block';
+            }
+
+            if (button) {
+                button.disabled = true;
+            }
 
             try {
                 // Prepare filter property as JSON string if both property and value are provided
@@ -533,23 +572,31 @@
                 const processedData = await response.json();
 
                 // Generate layer name
-                const selectedFile = document.getElementById('process-file');
-                const selectedOption = selectedFile.options[selectedFile.selectedIndex];
-                const fileName = selectedOption.dataset.name;
-                const layerName = `${fileName}_processed_heatmap`;
+                if (filePathElement) {
+                    const selectedOption = filePathElement.options[filePathElement.selectedIndex];
+                    if (selectedOption) {
+                        const fileName = selectedOption.dataset.name;
+                        const layerName = `${fileName}_processed_heatmap`;
 
-                // Add processed data to map
-                addLayerToMap(layerName, processedData);
+                        // Add processed data to map
+                        addLayerToMap(layerName, processedData);
 
-                console.log(`Successfully processed ${fileName} into heatmap with ${processedData.features.length} points`);
+                        console.log(`Successfully processed ${fileName} into heatmap with ${processedData.features.length} points`);
+                    }
+                }
 
             } catch (error) {
                 console.error('Error processing GeoJSON:', error);
                 alert(`Error processing GeoJSON: ${error.message}`);
             } finally {
                 // Hide loading indicator
-                loadingIndicator.style.display = 'none';
-                button.disabled = false;
+                if (loadingIndicator) {
+                    loadingIndicator.style.display = 'none';
+                }
+
+                if (button) {
+                    button.disabled = false;
+                }
             }
         }
 
@@ -847,8 +894,16 @@
 
         // Initialize decay parameters based on selected decay function
         function updateDecayParams() {
-            const decayType = document.getElementById('build-decay').value;
+            const decayElement = document.getElementById('build-decay');
             const container = document.getElementById('decay-params-container');
+
+            // Check if elements exist
+            if (!decayElement || !container) {
+                console.error('Decay elements not found in DOM');
+                return;
+            }
+
+            const decayType = decayElement.value;
 
             // Clear existing parameters
             container.innerHTML = '';
@@ -875,8 +930,52 @@
             }
         }
 
+        // Function to update mode options based on geometry type
+        function updateBuildModeOptions() {
+            const geometryTypeElement = document.getElementById('build-geometry-type');
+            const modeSelect = document.getElementById('build-mode');
+
+            // Check if elements exist
+            if (!geometryTypeElement || !modeSelect) {
+                console.error('Build mode elements not found in DOM');
+                return;
+            }
+
+            const geometryType = geometryTypeElement.value;
+
+            // Clear existing options
+            modeSelect.innerHTML = '';
+
+            // Add options based on geometry type
+            if (geometryType === 'point') {
+                modeSelect.innerHTML = `
+                    <option value="nearest">Nearest (Count)</option>
+                    <option value="sum_k">Sum K (Density)</option>
+                `;
+            } else if (geometryType === 'line') {
+                modeSelect.innerHTML = `
+                    <option value="nearest">Nearest</option>
+                `;
+            } else if (geometryType === 'polygon') {
+                modeSelect.innerHTML = `
+                    <option value="mask">Mask</option>
+                    <option value="centroid">Centroid</option>
+                    <option value="boundary">Boundary</option>
+                `;
+            }
+        }
+
+        // Add event listener for geometry type change
+        const geometryTypeElement = document.getElementById('build-geometry-type');
+        if (geometryTypeElement) {
+            geometryTypeElement.addEventListener('change', updateBuildModeOptions);
+        }
+
         // Add event listener for decay function change
-        document.getElementById('build-decay').addEventListener('change', updateDecayParams);
+        const decayElement = document.getElementById('build-decay');
+        if (decayElement) {
+            decayElement.addEventListener('change', updateDecayParams);
+        }
 
         // Function to add a new layer configuration to the multi-layer form
         function addLayerConfig() {
@@ -951,8 +1050,16 @@
                 updateMultiLayerPropertyOptions(this.value, layerId);
             });
 
+            // Add event listener for geometry type change
+            document.getElementById(`multi-geometry-type-${layerId}`).addEventListener('change', function() {
+                updateMultiModeOptions(layerId);
+            });
+
             // Initialize decay params
             updateMultiDecayParams(layerId);
+
+            // Initialize mode options
+            updateMultiModeOptions(layerId);
         }
 
         // Function to remove a layer configuration
@@ -963,10 +1070,53 @@
             }
         }
 
+        // Function to update mode options for a multi-layer config
+        function updateMultiModeOptions(layerId) {
+            const geometryTypeElement = document.getElementById(`multi-geometry-type-${layerId}`);
+            const modeSelect = document.getElementById(`multi-mode-${layerId}`);
+
+            // Check if elements exist
+            if (!geometryTypeElement || !modeSelect) {
+                console.error(`Multi-mode elements not found for layer ${layerId}`);
+                return;
+            }
+
+            const geometryType = geometryTypeElement.value;
+
+            // Clear existing options
+            modeSelect.innerHTML = '';
+
+            // Add options based on geometry type
+            if (geometryType === 'point') {
+                modeSelect.innerHTML = `
+                    <option value="nearest">Nearest (Count)</option>
+                    <option value="sum_k">Sum K (Density)</option>
+                `;
+            } else if (geometryType === 'line') {
+                modeSelect.innerHTML = `
+                    <option value="nearest">Nearest</option>
+                `;
+            } else if (geometryType === 'polygon') {
+                modeSelect.innerHTML = `
+                    <option value="mask">Mask</option>
+                    <option value="centroid">Centroid</option>
+                    <option value="boundary">Boundary</option>
+                `;
+            }
+        }
+
         // Function to update decay parameters for a multi-layer config
         function updateMultiDecayParams(layerId) {
-            const decayType = document.getElementById(`multi-decay-${layerId}`).value;
+            const decayElement = document.getElementById(`multi-decay-${layerId}`);
             const container = document.getElementById(`multi-decay-params-${layerId}`);
+
+            // Check if elements exist
+            if (!decayElement || !container) {
+                console.error(`Multi-decay elements not found for layer ${layerId}`);
+                return;
+            }
+
+            const decayType = decayElement.value;
 
             // Clear existing parameters
             container.innerHTML = '';
@@ -1007,11 +1157,16 @@
             const weightSelect = document.getElementById('build-weight-property');
             const filterSelect = document.getElementById('build-filter-property');
 
-            // Clear existing options
-            weightSelect.innerHTML = '<option value="">Choose a property...</option>';
-            filterSelect.innerHTML = '<option value="">Choose a property...</option>';
+            // Check if elements exist before setting innerHTML
+            if (weightSelect) {
+                weightSelect.innerHTML = '<option value="">Choose a property...</option>';
+            }
 
-            if (filePath && selectedOption) {
+            if (filterSelect) {
+                filterSelect.innerHTML = '<option value="">Choose a property...</option>';
+            }
+
+            if (filePath && selectedOption && weightSelect && filterSelect) {
                 try {
                     const directory = selectedOption.dataset.dir;
                     const filename = selectedOption.dataset.name;
@@ -1058,13 +1213,24 @@
             const weightSelect = document.getElementById(`multi-weight-property-${layerId}`);
             const filterSelect = document.getElementById(`multi-filter-property-${layerId}`);
 
-            // Clear existing options
-            weightSelect.innerHTML = '<option value="">Choose a property...</option>';
-            filterSelect.innerHTML = '<option value="">Choose a property...</option>';
+            // Check if elements exist before setting innerHTML
+            if (weightSelect) {
+                weightSelect.innerHTML = '<option value="">Choose a property...</option>';
+            }
 
-            if (filePath) {
+            if (filterSelect) {
+                filterSelect.innerHTML = '<option value="">Choose a property...</option>';
+            }
+
+            if (filePath && weightSelect && filterSelect) {
                 try {
-                    const selectedOption = document.getElementById(`multi-source-id-${layerId}`).selectedOptions[0];
+                    const sourceElement = document.getElementById(`multi-source-id-${layerId}`);
+                    if (!sourceElement || !sourceElement.selectedOptions || !sourceElement.selectedOptions[0]) {
+                        console.error('Source element or selected option not found');
+                        return;
+                    }
+
+                    const selectedOption = sourceElement.selectedOptions[0];
                     const directory = selectedOption.dataset.dir;
                     const filename = selectedOption.dataset.name;
 
@@ -1107,18 +1273,39 @@
 
         // Build Layer function
         async function buildLayer() {
-            const sourceId = document.getElementById('build-source-id').value;
-            const geometryType = document.getElementById('build-geometry-type').value;
-            const mode = document.getElementById('build-mode').value;
-            const weightProperty = document.getElementById('build-weight-property').value || null;
-            const filterProperty = document.getElementById('build-filter-property').value;
-            const filterValue = document.getElementById('build-filter-value').value;
-            const datasetWeight = parseFloat(document.getElementById('build-dataset-weight').value);
-            const decay = document.getElementById('build-decay').value;
-            const k = parseInt(document.getElementById('build-k').value);
-            const maskValue = parseFloat(document.getElementById('build-mask-value').value);
-            const gridSize = parseInt(document.getElementById('build-grid-size').value);
-            const outputFilename = document.getElementById('build-output-filename').value;
+            // Get all required elements
+            const sourceIdElement = document.getElementById('build-source-id');
+            const geometryTypeElement = document.getElementById('build-geometry-type');
+            const modeElement = document.getElementById('build-mode');
+            const weightPropertyElement = document.getElementById('build-weight-property');
+            const filterPropertyElement = document.getElementById('build-filter-property');
+            const filterValueElement = document.getElementById('build-filter-value');
+            const datasetWeightElement = document.getElementById('build-dataset-weight');
+            const decayElement = document.getElementById('build-decay');
+            const kElement = document.getElementById('build-k');
+            const maskValueElement = document.getElementById('build-mask-value');
+            const gridSizeElement = document.getElementById('build-grid-size');
+            const outputFilenameElement = document.getElementById('build-output-filename');
+
+            // Check if required elements exist
+            if (!sourceIdElement || !geometryTypeElement || !modeElement || !gridSizeElement || !outputFilenameElement) {
+                console.error('Required build elements not found in DOM');
+                return;
+            }
+
+            // Get values from elements
+            const sourceId = sourceIdElement.value;
+            const geometryType = geometryTypeElement.value;
+            const mode = modeElement.value;
+            const weightProperty = weightPropertyElement ? weightPropertyElement.value || null : null;
+            const filterProperty = filterPropertyElement ? filterPropertyElement.value : null;
+            const filterValue = filterValueElement ? filterValueElement.value : null;
+            const datasetWeight = datasetWeightElement ? parseFloat(datasetWeightElement.value) : 1.0;
+            const decay = decayElement ? decayElement.value : 'exp';
+            const k = kElement ? parseInt(kElement.value) : 8;
+            const maskValue = maskValueElement ? parseFloat(maskValueElement.value) : 1.0;
+            const gridSize = parseInt(gridSizeElement.value);
+            const outputFilename = outputFilenameElement.value;
 
             if (!sourceId) {
                 alert('Please select a source file.');
@@ -1128,12 +1315,24 @@
             // Get decay parameters based on decay type
             let decayParams = {};
             if (decay === 'exp') {
-                decayParams.scale = parseFloat(document.getElementById('decay-scale').value);
+                const scaleElement = document.getElementById('decay-scale');
+                if (scaleElement) {
+                    decayParams.scale = parseFloat(scaleElement.value);
+                }
             } else if (decay === 'inv') {
-                decayParams.eps = parseFloat(document.getElementById('decay-eps').value);
-                decayParams.power = parseFloat(document.getElementById('decay-power').value);
+                const epsElement = document.getElementById('decay-eps');
+                const powerElement = document.getElementById('decay-power');
+                if (epsElement) {
+                    decayParams.eps = parseFloat(epsElement.value);
+                }
+                if (powerElement) {
+                    decayParams.power = parseFloat(powerElement.value);
+                }
             } else if (decay === 'linear') {
-                decayParams.radius = parseFloat(document.getElementById('decay-radius').value);
+                const radiusElement = document.getElementById('decay-radius');
+                if (radiusElement) {
+                    decayParams.radius = parseFloat(radiusElement.value);
+                }
             }
 
             // Prepare filter property as JSON object if both property and value are provided
@@ -1145,8 +1344,14 @@
             // Show loading indicator
             const loadingIndicator = document.getElementById('build-loading');
             const button = document.getElementById('build-layer-btn');
-            loadingIndicator.style.display = 'block';
-            button.disabled = true;
+
+            if (loadingIndicator) {
+                loadingIndicator.style.display = 'block';
+            }
+
+            if (button) {
+                button.disabled = true;
+            }
 
             try {
                 // Prepare request body
@@ -1207,8 +1412,13 @@
                 alert(`Error building layer: ${error.message}`);
             } finally {
                 // Hide loading indicator
-                loadingIndicator.style.display = 'none';
-                button.disabled = false;
+                if (loadingIndicator) {
+                    loadingIndicator.style.display = 'none';
+                }
+
+                if (button) {
+                    button.disabled = false;
+                }
             }
         }
 
@@ -1220,46 +1430,98 @@
                 return;
             }
 
-            const gridSize = parseInt(document.getElementById('multi-grid-size').value);
-            const outputFilename = document.getElementById('multi-output-filename').value;
+            const gridSizeElement = document.getElementById('multi-grid-size');
+            const outputFilenameElement = document.getElementById('multi-output-filename');
+
+            // Check if required elements exist
+            if (!gridSizeElement || !outputFilenameElement) {
+                console.error('Required multi-layer elements not found in DOM');
+                return;
+            }
+
+            const gridSize = parseInt(gridSizeElement.value);
+            const outputFilename = outputFilenameElement.value;
 
             // Show loading indicator
             const loadingIndicator = document.getElementById('multi-build-loading');
             const button = document.getElementById('build-multi-layer-btn');
-            loadingIndicator.style.display = 'block';
-            button.disabled = true;
+
+            if (loadingIndicator) {
+                loadingIndicator.style.display = 'block';
+            }
+
+            if (button) {
+                button.disabled = true;
+            }
 
             try {
                 // Prepare layers array
                 const layers = [];
 
                 for (const config of layerConfigs) {
-                    const layerId = config.id.replace('layer-config-', '');
-                    const sourceId = document.getElementById(`multi-source-id-${layerId}`).value;
-
-                    if (!sourceId) {
-                        throw new Error(`Source ID is required for all layers.`);
+                    if (!config.id) {
+                        console.error('Layer config ID not found');
+                        continue;
                     }
 
-                    const geometryType = document.getElementById(`multi-geometry-type-${layerId}`).value;
-                    const mode = document.getElementById(`multi-mode-${layerId}`).value;
-                    const weightProperty = document.getElementById(`multi-weight-property-${layerId}`).value || null;
-                    const filterProperty = document.getElementById(`multi-filter-property-${layerId}`).value;
-                    const filterValue = document.getElementById(`multi-filter-value-${layerId}`).value;
-                    const datasetWeight = parseFloat(document.getElementById(`multi-dataset-weight-${layerId}`).value);
-                    const decay = document.getElementById(`multi-decay-${layerId}`).value;
-                    const k = parseInt(document.getElementById(`multi-k-${layerId}`).value);
-                    const maskValue = parseFloat(document.getElementById(`multi-mask-value-${layerId}`).value);
+                    const layerId = config.id.replace('layer-config-', '');
+                    const sourceIdElement = document.getElementById(`multi-source-id-${layerId}`);
+
+                    if (!sourceIdElement) {
+                        console.error(`Source ID element not found for layer ${layerId}`);
+                        continue;
+                    }
+
+                    const sourceId = sourceIdElement.value;
+
+                    if (!sourceId) {
+                        console.error(`Source ID is required for layer ${layerId}`);
+                        continue;
+                    }
+
+                    // Get all elements with null checks
+                    const geometryTypeElement = document.getElementById(`multi-geometry-type-${layerId}`);
+                    const modeElement = document.getElementById(`multi-mode-${layerId}`);
+                    const weightPropertyElement = document.getElementById(`multi-weight-property-${layerId}`);
+                    const filterPropertyElement = document.getElementById(`multi-filter-property-${layerId}`);
+                    const filterValueElement = document.getElementById(`multi-filter-value-${layerId}`);
+                    const datasetWeightElement = document.getElementById(`multi-dataset-weight-${layerId}`);
+                    const decayElement = document.getElementById(`multi-decay-${layerId}`);
+                    const kElement = document.getElementById(`multi-k-${layerId}`);
+                    const maskValueElement = document.getElementById(`multi-mask-value-${layerId}`);
+
+                    // Get values with null checks
+                    const geometryType = geometryTypeElement ? geometryTypeElement.value : 'point';
+                    const mode = modeElement ? modeElement.value : 'density';
+                    const weightProperty = weightPropertyElement ? weightPropertyElement.value || null : null;
+                    const filterProperty = filterPropertyElement ? filterPropertyElement.value : null;
+                    const filterValue = filterValueElement ? filterValueElement.value : null;
+                    const datasetWeight = datasetWeightElement ? parseFloat(datasetWeightElement.value) : 1.0;
+                    const decay = decayElement ? decayElement.value : 'exp';
+                    const k = kElement ? parseInt(kElement.value) : 8;
+                    const maskValue = maskValueElement ? parseFloat(maskValueElement.value) : 1.0;
 
                     // Get decay parameters based on decay type
                     let decayParams = {};
                     if (decay === 'exp') {
-                        decayParams.scale = parseFloat(document.getElementById(`multi-decay-scale-${layerId}`).value);
+                        const scaleElement = document.getElementById(`multi-decay-scale-${layerId}`);
+                        if (scaleElement) {
+                            decayParams.scale = parseFloat(scaleElement.value);
+                        }
                     } else if (decay === 'inv') {
-                        decayParams.eps = parseFloat(document.getElementById(`multi-decay-eps-${layerId}`).value);
-                        decayParams.power = parseFloat(document.getElementById(`multi-decay-power-${layerId}`).value);
+                        const epsElement = document.getElementById(`multi-decay-eps-${layerId}`);
+                        const powerElement = document.getElementById(`multi-decay-power-${layerId}`);
+                        if (epsElement) {
+                            decayParams.eps = parseFloat(epsElement.value);
+                        }
+                        if (powerElement) {
+                            decayParams.power = parseFloat(powerElement.value);
+                        }
                     } else if (decay === 'linear') {
-                        decayParams.radius = parseFloat(document.getElementById(`multi-decay-radius-${layerId}`).value);
+                        const radiusElement = document.getElementById(`multi-decay-radius-${layerId}`);
+                        if (radiusElement) {
+                            decayParams.radius = parseFloat(radiusElement.value);
+                        }
                     }
 
                     // Prepare filter property as JSON object if both property and value are provided
@@ -1281,6 +1543,10 @@
                         mask_value: maskValue,
                         output_filename: `temp_layer_${layerId}.geojson` // Temporary filename for individual layers
                     });
+                }
+
+                if (layers.length === 0) {
+                    throw new Error('No valid layers found to process');
                 }
 
                 // Prepare request body
@@ -1330,8 +1596,13 @@
                 alert(`Error building multi-layer: ${error.message}`);
             } finally {
                 // Hide loading indicator
-                loadingIndicator.style.display = 'none';
-                button.disabled = false;
+                if (loadingIndicator) {
+                    loadingIndicator.style.display = 'none';
+                }
+
+                if (button) {
+                    button.disabled = false;
+                }
             }
         }
 
