@@ -6,10 +6,14 @@ import geopandas as gpd
 from shapely.geometry import Point
 from typing import Dict, List, Tuple, Union, Optional
 
+# Import engine.py components
+from map_baker.engine import GeoJSONProcessor as EngineProcessor, GeoCatalog, GridSpec, LayerSpec
+
 
 class GeoJSONProcessor:
     """
     A class to process GeoJSON files and generate heatmaps based on feature density.
+    Uses the engine.py components for advanced processing capabilities.
     """
 
     def __init__(self, geojson_path: str = None):
@@ -23,6 +27,14 @@ class GeoJSONProcessor:
         self.gdf = None
         self.features = None
         self.bounds = None
+
+        # Initialize engine components
+        self.engine_processor = EngineProcessor()
+        self.catalog = GeoCatalog()
+        self.engine_processor.attach_catalog(self.catalog)
+
+        # Source ID for the main file
+        self.main_source_id = "main"
 
         if geojson_path:
             self.load_geojson(geojson_path)
@@ -77,6 +89,9 @@ class GeoJSONProcessor:
         # Get bounds
         self.bounds = self.gdf.total_bounds  # [minx, miny, maxx, maxy]
 
+        # Add to catalog
+        self.catalog.add(self.main_source_id, geojson_path)
+
         return self.gdf
 
     def generate_heatmap(self, grid_size: int,
@@ -84,7 +99,7 @@ class GeoJSONProcessor:
                          filter_property: Optional[Dict] = None,
                          bounds: Optional[Tuple[float, float, float, float]] = None) -> pd.DataFrame:
         """
-        Generate a heatmap based on feature density.
+        Generate a heatmap based on feature density using engine.py.
 
         Args:
             grid_size (int): Size of the grid (number of cells in each dimension).
@@ -98,62 +113,51 @@ class GeoJSONProcessor:
         if self.gdf is None:
             raise ValueError("No GeoJSON loaded. Call load_geojson() first.")
 
-        # Filter features if needed
-        filtered_gdf = self.gdf
-        if filter_property:
-            for key, value in filter_property.items():
-                filtered_gdf = filtered_gdf[filtered_gdf[key] == value]
+        # Determine the geometry type to use
+        geometry_type = "point"  # Default to point
+        if not self.gdf.empty:
+            # Check the most common geometry type
+            geom_types = self.gdf.geometry.geom_type.value_counts()
+            if not geom_types.empty:
+                most_common = geom_types.index[0].lower()
+                if "polygon" in most_common:
+                    geometry_type = "polygon"
+                elif "line" in most_common:
+                    geometry_type = "line"
 
         # Get bounds
         if bounds is not None:
-            minx, miny, maxx, maxy = bounds
+            grid_bounds = bounds
         else:
-            minx, miny, maxx, maxy = filtered_gdf.total_bounds
+            # Use the bounds from the catalog for the main source
+            grid_bounds = self.catalog.sources[self.main_source_id].bounds_wgs
 
-        # Create grid
-        x_grid = np.linspace(minx, maxx, grid_size)
-        y_grid = np.linspace(miny, maxy, grid_size)
+        # Create a GridSpec
+        gridspec = GridSpec(
+            bounds=grid_bounds,
+            nx=grid_size,
+            ny=grid_size
+        )
 
-        # Initialize heatmap grid
-        heatmap = np.zeros((grid_size, grid_size))
+        # Create a LayerSpec
+        layer_spec = LayerSpec(
+            source_id=self.main_source_id,
+            geometry_type=geometry_type,
+            mode="nearest" if geometry_type == "point" else "mask" if geometry_type == "polygon" else "nearest",
+            filter_property=filter_property,
+            weight_property=weight_property,
+            dataset_weight=1.0,
+            decay="exp",  # Default decay function
+            decay_params={"scale": 1000.0}  # Default decay parameters
+        )
 
-        # Process each feature
-        for _, feature in filtered_gdf.iterrows():
-            # Get coordinates
-            x, y = feature.geometry.x, feature.geometry.y
-
-            # Find grid cell
-            x_idx = np.searchsorted(x_grid, x) - 1
-            y_idx = np.searchsorted(y_grid, y) - 1
-
-            # Ensure indices are within bounds
-            x_idx = max(0, min(x_idx, grid_size - 1))
-            y_idx = max(0, min(y_idx, grid_size - 1))
-
-            # Add to heatmap (with weight if specified)
-            weight = 1.0
-            if weight_property and weight_property in feature:
-                try:
-                    weight = float(feature[weight_property])
-                except (ValueError, TypeError):
-                    pass  # Use default weight if conversion fails
-
-            heatmap[y_idx, x_idx] += weight
-
-        # Create DataFrame for visualization
-        lon_grid, lat_grid = np.meshgrid(x_grid, y_grid)
-        df = pd.DataFrame({
-            'lat': lat_grid.flatten(),
-            'lon': lon_grid.flatten(),
-            'value': heatmap.flatten()
-        })
-
-        return df
+        # Generate the heatmap using the engine
+        return self.engine_processor.generate_layer_on_grid(gridspec, layer_spec)
 
     def generate_weighted_heatmap(self, grid_size: int,
                                   datasets: List[Dict[str, Union[str, float]]]) -> pd.DataFrame:
         """
-        Generate a weighted heatmap from multiple datasets.
+        Generate a weighted heatmap from multiple datasets from the same GeoJSON file.
 
         Args:
             grid_size (int): Size of the grid (number of cells in each dimension).
@@ -305,9 +309,81 @@ class GeoJSONProcessor:
         else:
             raise ValueError(f"Unsupported format: {format}. Use 'csv' or 'geojson'.")
 
+    def generate_multi_file_heatmap(self, grid_size: int,
+                                    datasets: List[Dict[str, Union[str, float]]]) -> pd.DataFrame:
+        """
+        Generate a weighted heatmap from multiple GeoJSON files using engine.py.
+
+        Args:
+            grid_size (int): Size of the grid (number of cells in each dimension).
+            datasets (List[Dict]): List of dataset configurations, each with:
+                - file_path (str): Path to the GeoJSON file
+                - filter_property (Dict, optional): Filter to apply, e.g. {'class': 'Renewable'}
+                - weight_property (str, optional): Property to use for weighting
+                - dataset_weight (float, optional): Weight for this dataset in the final heatmap
+
+        Returns:
+            pd.DataFrame: DataFrame with lat, lon, and value columns for the heatmap.
+        """
+        if not datasets:
+            raise ValueError("No datasets provided")
+
+        # Create a new catalog and processor for this operation
+        catalog = GeoCatalog()
+        processor = EngineProcessor()
+        processor.attach_catalog(catalog)
+
+        # Add each dataset to the catalog with a unique source_id
+        layer_specs = []
+        for i, dataset in enumerate(datasets):
+            file_path = dataset.get('file_path')
+            if not file_path:
+                continue
+
+            source_id = f"source_{i}"
+            catalog.add(source_id, file_path)
+
+            # Determine geometry type
+            gdf = gpd.read_file(file_path)
+            geometry_type = "point"  # Default to point
+            if not gdf.empty:
+                # Check the most common geometry type
+                geom_types = gdf.geometry.geom_type.value_counts()
+                if not geom_types.empty:
+                    most_common = geom_types.index[0].lower()
+                    if "polygon" in most_common:
+                        geometry_type = "polygon"
+                    elif "line" in most_common:
+                        geometry_type = "line"
+
+            # Create a LayerSpec for this dataset
+            layer_specs.append(LayerSpec(
+                source_id=source_id,
+                geometry_type=geometry_type,
+                mode="nearest" if geometry_type == "point" else "mask" if geometry_type == "polygon" else "nearest",
+                filter_property=dataset.get('filter_property'),
+                weight_property=dataset.get('weight_property'),
+                dataset_weight=dataset.get('dataset_weight', 1.0),
+                decay="exp",  # Default decay function
+                decay_params={"scale": 1000.0}  # Default decay parameters
+            ))
+
+        # Get combined bounds from the catalog
+        bounds = catalog.combined_bounds_wgs()
+
+        # Create a GridSpec
+        gridspec = GridSpec(
+            bounds=bounds,
+            nx=grid_size,
+            ny=grid_size
+        )
+
+        # Generate the combined heatmap using the engine
+        return processor.generate_linear_combination_multi(gridspec, layer_specs)
+
     def generate_and_save_weighted_heatmap(self, grid_size: int, output_path: str,
-                                          datasets: List[Dict[str, Union[str, float]]],
-                                          format: str = 'csv') -> str:
+                                           datasets: List[Dict[str, Union[str, float]]],
+                                           format: str = 'csv') -> str:
         """
         Generate a weighted heatmap from multiple datasets and save it to disk in one step.
 
