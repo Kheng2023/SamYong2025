@@ -81,7 +81,8 @@ class GeoJSONProcessor:
 
     def generate_heatmap(self, grid_size: int,
                          weight_property: Optional[str] = None,
-                         filter_property: Optional[Dict] = None) -> pd.DataFrame:
+                         filter_property: Optional[Dict] = None,
+                         bounds: Optional[Tuple[float, float, float, float]] = None) -> pd.DataFrame:
         """
         Generate a heatmap based on feature density.
 
@@ -89,6 +90,7 @@ class GeoJSONProcessor:
             grid_size (int): Size of the grid (number of cells in each dimension).
             weight_property (str, optional): Property name to use for weighting points.
             filter_property (Dict, optional): Filter features by property, e.g. {'class': 'Renewable'}.
+            bounds (Tuple[float, float, float, float], optional): Bounds to use for the grid (minx, miny, maxx, maxy).
 
         Returns:
             pd.DataFrame: DataFrame with lat, lon, and value columns for the heatmap.
@@ -103,7 +105,10 @@ class GeoJSONProcessor:
                 filtered_gdf = filtered_gdf[filtered_gdf[key] == value]
 
         # Get bounds
-        minx, miny, maxx, maxy = filtered_gdf.total_bounds
+        if bounds is not None:
+            minx, miny, maxx, maxy = bounds
+        else:
+            minx, miny, maxx, maxy = filtered_gdf.total_bounds
 
         # Create grid
         x_grid = np.linspace(minx, maxx, grid_size)
@@ -180,7 +185,7 @@ class GeoJSONProcessor:
             dataset_weight = dataset.get('dataset_weight', 1.0)
 
             # Generate individual heatmap
-            heatmap_df = self.generate_heatmap(grid_size, weight_prop, filter_prop)
+            heatmap_df = self.generate_heatmap(grid_size, weight_prop, filter_prop, bounds=self.bounds)
 
             # Reshape and add to combined heatmap
             heatmap_values = heatmap_df['value'].values.reshape(grid_size, grid_size)
@@ -237,29 +242,6 @@ class GeoJSONProcessor:
         gdf.to_file(output_path, driver='GeoJSON')
 
         return output_path
-
-    def load_heatmap_csv(self, file_path: str) -> pd.DataFrame:
-        """
-        Load a heatmap from a CSV file.
-
-        Args:
-            file_path (str): Path to the CSV file.
-
-        Returns:
-            pd.DataFrame: DataFrame with lat, lon, and value columns.
-        """
-        if not os.path.exists(file_path):
-            raise FileNotFoundError(f"Heatmap file not found: {file_path}")
-
-        # Load from CSV
-        df = pd.read_csv(file_path)
-
-        # Validate the DataFrame
-        required_columns = ['lat', 'lon', 'value']
-        if not all(col in df.columns for col in required_columns):
-            raise ValueError(f"CSV file must contain columns: {required_columns}")
-
-        return df
 
     def load_heatmap_geojson(self, file_path: str) -> pd.DataFrame:
         """
@@ -387,12 +369,6 @@ if __name__ == "__main__":
     print(f"Generated heatmap with {len(heatmap_df)} points")
     print(f"Generated weighted heatmap with {len(weighted_heatmap_df)} points")
 
-    # Save as CSV (simple format)
-    csv_path = processor.save_heatmap_csv(heatmap_df, "output/simple_heatmap.csv")
-    weighted_csv_path = processor.save_heatmap_csv(weighted_heatmap_df, "output/weighted_heatmap.csv")
-
-    print(f"Saved heatmaps to CSV: {csv_path} and {weighted_csv_path}")
-
     # Save as GeoJSON (geospatial format)
     geojson_path = processor.save_heatmap_geojson(heatmap_df, "output/simple_heatmap.geojson")
     weighted_geojson_path = processor.save_heatmap_geojson(weighted_heatmap_df, "output/weighted_heatmap.geojson")
@@ -401,14 +377,6 @@ if __name__ == "__main__":
 
     # Method 2: Use convenience methods to generate and save in one step
     print("\n--- Method 2: Generate and save in one step ---")
-
-    # Generate and save simple heatmap
-    csv_path2 = processor.generate_and_save_heatmap(
-        grid_size=50,
-        output_path="output/simple_heatmap2.csv",
-        format="csv",
-        filter_property={'class': 'Renewable'}
-    )
 
     # Generate and save weighted heatmap
     geojson_path2 = processor.generate_and_save_weighted_heatmap(
@@ -429,15 +397,13 @@ if __name__ == "__main__":
         ]
     )
 
-    print(f"Generated and saved heatmaps in one step: {csv_path2} and {geojson_path2}")
+    print(f"Generated and saved weighted heatmap in one step: {geojson_path2}")
 
     # Load heatmaps back from disk
     print("\n--- Loading saved heatmaps ---")
 
-    loaded_csv_df = processor.load_heatmap_csv(csv_path)
     loaded_geojson_df = processor.load_heatmap_geojson(geojson_path)
 
-    print(f"Loaded heatmap from CSV: {len(loaded_csv_df)} points")
     print(f"Loaded heatmap from GeoJSON: {len(loaded_geojson_df)} points")
 
     # These loaded DataFrames can now be used directly with Streamlit's pydeck HeatmapLayer
