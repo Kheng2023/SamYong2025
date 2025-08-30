@@ -1,0 +1,8 @@
+[project]
+name = "geoheat-multi"
+version = "0.1.0"
+description = "Multi-source geo heatmap demo"
+requires-python = ">=3.9"
+
+[tool.pytest.ini_options]
+addopts = "-q"
