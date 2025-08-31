@@ -35,6 +35,11 @@ DATA_DIRS = {
 
 # Define output directory for processed files
 GEOJSONS_DIR = "/app/geojsons" if os.path.exists("/app/geojsons") else "geojsons"
+# Subfolder for generated heatmaps
+HEATMAPS_SUBFOLDER = "heatmaps"
+HEATMAPS_DIR = os.path.join(GEOJSONS_DIR, HEATMAPS_SUBFOLDER)
+# Ensure the directory exists
+os.makedirs(HEATMAPS_DIR, exist_ok=True)
 
 # Define models
 class GeoJSONFile(BaseModel):
@@ -60,14 +65,18 @@ class LayerSpecModel(BaseModel):
     source_id: str
     geometry_type: Literal["point", "line", "polygon"]
     mode: str
-    filter_property: Optional[Dict[str, Any]] = None
-    weight_property: Optional[str] = None
+    filter_property: Optional[Dict[str, Any]] = None  # allow list values too
+    weight_property: Optional[str] = None             # existing numeric-weight column support
     dataset_weight: float = 1.0
     decay: str = "exp"
     decay_params: Optional[Dict[str, Any]] = None
     k: int = 8
     mask_value: float = 1.0
     output_filename: str
+
+    # NEW: property-based per-value ranks
+    weight_by_property: Optional[str] = None          # e.g., "generationtype"
+    weight_ranks: Optional[Dict[str, float]] = None   # e.g., {"Wind Turbine": 1, "Coal": 5}
 
 class BuildLayerRequest(BaseModel):
     layer: LayerSpecModel
@@ -103,6 +112,32 @@ async def list_geojson_files():
     files = get_geojson_files()
     return {"files": files}
 
+# New: list generated heatmaps from subfolder
+@app.get("/api/heatmaps")
+async def list_heatmaps():
+    try:
+        items = []
+        if os.path.exists(HEATMAPS_DIR):
+            for file in os.listdir(HEATMAPS_DIR):
+                if file.endswith((".geojson", ".geo.json")):
+                    fp = os.path.join(HEATMAPS_DIR, file)
+                    items.append({
+                        "name": file,
+                        "path": fp,
+                        "size": os.path.getsize(fp)
+                    })
+        return {"files": items}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# New: fetch a specific generated heatmap
+@app.get("/api/heatmaps/{filename}")
+async def get_heatmap(filename: str):
+    fp = os.path.join(HEATMAPS_DIR, filename)
+    if not os.path.exists(fp):
+        raise HTTPException(status_code=404, detail=f"Heatmap '{filename}' not found")
+    return FileResponse(fp)
+
 @app.get("/api/files/{directory}/{filename}")
 async def get_geojson_file(directory: str, filename: str):
     """Get a specific GeoJSON file."""
@@ -114,6 +149,44 @@ async def get_geojson_file(directory: str, filename: str):
         raise HTTPException(status_code=404, detail=f"File '{filename}' not found in '{directory}'")
 
     return FileResponse(file_path)
+
+# Helper endpoints to list properties and their distinct values
+@app.get("/api/properties")
+async def list_properties(file_path: str):
+    """Return property names for the given GeoJSON file (excluding geometry)."""
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail=f"File not found: {file_path}")
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        props = set()
+        for feat in data.get("features", []):
+            pr = feat.get("properties", {}) or {}
+            for k in pr.keys():
+                props.add(k)
+        return {"properties": sorted(list(props))}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/property-values")
+async def list_property_values(file_path: str, property: str):
+    """Return distinct values for a given property in the specified GeoJSON file."""
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail=f"File not found: {file_path}")
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        values = set()
+        for feat in data.get("features", []):
+            pr = feat.get("properties", {}) or {}
+            if property in pr:
+                v = pr.get(property)
+                if v is not None:
+                    values.add(v)
+        values_list = sorted([str(v) if not isinstance(v, (int, float, str)) else v for v in values])
+        return {"values": values_list}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/process", response_model=Dict)
 async def process_geojson(
@@ -144,8 +217,8 @@ async def process_geojson(
             name_parts = os.path.splitext(base_name)
             output_filename = f"{name_parts[0]}_processed{name_parts[1]}"
 
-        # Save to GeoJSON in the mapped volume
-        output_path = os.path.join(GEOJSONS_DIR, output_filename)
+        # Save to GeoJSON in the mapped volume (generated heatmaps subfolder)
+        output_path = os.path.join(HEATMAPS_DIR, output_filename)
         processor.save_heatmap_geojson(heatmap_df, output_path)
 
         # Read the GeoJSON file
@@ -190,7 +263,7 @@ async def aggregate_layers(request: AggregateRequest):
 
         # Save to GeoJSON in the mapped volume
         output_filename = "aggregated_heatmap.geojson"
-        output_path = os.path.join(GEOJSONS_DIR, output_filename)
+        output_path = os.path.join(HEATMAPS_DIR, output_filename)
         processor.save_heatmap_geojson(heatmap_df, output_path)
 
         # Read the GeoJSON file
@@ -233,14 +306,17 @@ async def build_layer(request: BuildLayerRequest):
             decay=request.layer.decay,
             decay_params=request.layer.decay_params,
             k=request.layer.k,
-            mask_value=request.layer.mask_value
+            mask_value=request.layer.mask_value,
+            # NEW fields
+            weight_by_property=request.layer.weight_by_property,
+            weight_ranks=request.layer.weight_ranks
         )
 
         # Generate the layer
         layer_df = processor.engine_processor.generate_layer_on_grid(gridspec, layer_spec)
 
         # Save to GeoJSON in the mapped volume
-        output_path = os.path.join(GEOJSONS_DIR, request.layer.output_filename)
+        output_path = os.path.join(HEATMAPS_DIR, request.layer.output_filename)
         processor.save_heatmap_geojson(layer_df, output_path)
 
         return {"status": "success", "message": f"Layer saved to {output_path}"}
@@ -282,22 +358,29 @@ async def build_multi_layer(request: BuildMultiLayerRequest):
                 decay=layer.decay,
                 decay_params=layer.decay_params,
                 k=layer.k,
-                mask_value=layer.mask_value
+                mask_value=layer.mask_value,
+                # NEW
+                weight_by_property=layer.weight_by_property,
+                weight_ranks=layer.weight_ranks
             ))
 
         # Generate the combined layer
         combined_df = processor.engine_processor.generate_linear_combination_multi(gridspec, layer_specs)
 
         # Save to GeoJSON in the mapped volume
-        output_path = os.path.join(GEOJSONS_DIR, request.output_filename)
+        output_path = os.path.join(HEATMAPS_DIR, request.output_filename)
         processor.save_heatmap_geojson(combined_df, output_path)
 
         return {"status": "success", "message": f"Combined layer saved to {output_path}"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# Mount static files for frontend
-app.mount("/", StaticFiles(directory="static", html=True), name="frontend")
+# Mount static files for frontend at /static and serve index at /
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+@app.get("/")
+async def root_index():
+    return FileResponse("static/index.html")
 
 # Run the app
 if __name__ == "__main__":

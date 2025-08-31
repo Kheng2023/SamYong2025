@@ -1,6 +1,7 @@
 
 import json
 from dataclasses import dataclass
+import dataclasses
 from typing import Optional, Dict, Tuple, List, Callable, Literal
 
 import numpy as np
@@ -113,6 +114,10 @@ class LayerSpec:
     k: int = 8
     mask_value: float = 1.0
 
+    # NEW: property-based per-value weight ranks (divisors)
+    weight_by_property: Optional[str] = None
+    weight_ranks: Optional[Dict[str, float]] = None
+
 
 # --------- engine ---------
 class GeoJSONProcessor:
@@ -138,7 +143,10 @@ class GeoJSONProcessor:
         out = gdf
         for k, v in flt.items():
             if k in out.columns:
-                out = out[out[k] == v]
+                if isinstance(v, (list, tuple, set)):
+                    out = out[out[k].isin(list(v))]
+                else:
+                    out = out[out[k] == v]
         return out
 
     # distance helpers
@@ -147,6 +155,20 @@ class GeoJSONProcessor:
         targets = [tree.geometries[i] for i in idxs]
         d = np.fromiter((p.distance(t) for p, t in zip(pts_grid, targets)), float, count=len(pts_grid))
         return d, np.asarray(idxs)
+
+    # helper for per-value ranks -> divisors
+    def _divisor_factors(self, df: gpd.GeoDataFrame, spec: LayerSpec, idxs: np.ndarray) -> Optional[np.ndarray]:
+        """Return 1/rank factor per matched feature index. idxs shape can be (N,) or (N,k)."""
+        if not (spec.weight_by_property and spec.weight_ranks):
+            return None
+        col = spec.weight_by_property
+        if col not in df.columns:
+            return None
+        feature_vals = df[col].astype(str).values
+        ranks_per_feat = np.array([float(spec.weight_ranks.get(str(v), 1.0)) for v in feature_vals], dtype=float)
+        ranks_per_feat[ranks_per_feat == 0] = 1.0
+        factors = 1.0 / ranks_per_feat[idxs]
+        return factors
 
     # per-geom evaluators
     def _eval_points_layer(self, src: GeoSource, gridspec: GridSpec, spec: LayerSpec) -> np.ndarray:
@@ -164,11 +186,19 @@ class GeoJSONProcessor:
         _, _, pts_grid = self._grid_pts_metric(gridspec)
         decay_fn = DECAYS.get(spec.decay, decay_exponential)
 
+        # Alias UI "weighted" to existing sum_k
+        if spec.mode == "weighted":
+            spec = dataclasses.replace(spec, mode="sum_k")
+
         if spec.mode == "nearest":
             d, idxs = self._nearest_distance(pts_grid, tree)
             vals = decay_fn(d, **(spec.decay_params or {}))
             if feat_w is not None:
                 vals *= feat_w[idxs]
+            # per-value ranks divisor
+            factors = self._divisor_factors(pts_df, spec, idxs)
+            if factors is not None:
+                vals *= factors
             return vals
 
         elif spec.mode == "sum_k":
@@ -185,14 +215,95 @@ class GeoJSONProcessor:
                 w = decay_fn(dists, **(spec.decay_params or {}))
                 if feat_w is not None:
                     fw = feat_w[idxs]
-                    return np.sum(w * fw, axis=1)
+                    w = w * fw
+                # per-value ranks divisor per neighbor
+                factors = self._divisor_factors(pts_df, spec, idxs)
+                if factors is not None:
+                    w = w * factors
                 return np.sum(w, axis=1)
             except Exception:
                 d, idxs = self._nearest_distance(pts_grid, tree)
                 vals = decay_fn(d, **(spec.decay_params or {}))
                 if feat_w is not None:
                     vals *= feat_w[idxs]
+                factors = self._divisor_factors(pts_df, spec, idxs)
+                if factors is not None:
+                    vals *= factors
                 return vals
+        # NEW: average value per grid cell ("density")
+        elif spec.mode == "density":
+            # Build metric bin edges for the grid bounds
+            minx, miny, maxx, maxy = gridspec.bounds
+            (mx0, my0) = self._to_metric.transform(minx, miny)
+            (mx1, my1) = self._to_metric.transform(maxx, maxy)
+            mx_min, mx_max = (min(mx0, mx1), max(mx0, mx1))
+            my_min, my_max = (min(my0, my1), max(my0, my1))
+
+            x_edges = np.linspace(mx_min, mx_max, gridspec.nx + 1)
+            y_edges = np.linspace(my_min, my_max, gridspec.ny + 1)
+
+            # Extract metric coordinates of filtered points
+            pxy = np.array([(g.x, g.y) for g in pts_df.geometry.values], dtype=float)
+            if pxy.size == 0:
+                return np.zeros(gridspec.nx * gridspec.ny, dtype=float)
+            px = pxy[:, 0]; py = pxy[:, 1]
+
+            # Cell indices per point
+            ix = np.digitize(px, x_edges) - 1
+            iy = np.digitize(py, y_edges) - 1
+            ix = np.clip(ix, 0, gridspec.nx - 1)
+            iy = np.clip(iy, 0, gridspec.ny - 1)
+            flat_idx = ix + iy * gridspec.nx
+
+            # Per-point values from weight_property if present; otherwise ones
+            if spec.weight_property and spec.weight_property in pts_df.columns:
+                vals = pd.to_numeric(pts_df[spec.weight_property], errors="coerce").values.astype(float)
+            else:
+                vals = np.ones_like(px, dtype=float)
+
+            # Apply per-value rank divisors if configured
+            if spec.weight_by_property and spec.weight_ranks and spec.weight_by_property in pts_df.columns:
+                rank_col = pts_df[spec.weight_by_property].astype(str).values
+                ranks = np.array([float(spec.weight_ranks.get(str(v), 1.0)) for v in rank_col], dtype=float)
+                ranks[ranks == 0] = 1.0
+                vals = vals / ranks
+
+            # Compute mean per cell, ignoring NaNs
+            n_cells = gridspec.nx * gridspec.ny
+            sum_per = np.zeros(n_cells, dtype=float)
+            cnt_per = np.zeros(n_cells, dtype=int)
+            mask = ~np.isnan(vals)
+            if np.any(mask):
+                np.add.at(sum_per, flat_idx[mask], vals[mask])
+                np.add.at(cnt_per, flat_idx[mask], 1)
+            with np.errstate(invalid="ignore", divide="ignore"):
+                means = np.where(cnt_per > 0, sum_per / cnt_per, 0.0)
+            return means
+
+        # OPTIONAL: exact count of points per grid cell
+        elif spec.mode == "count":
+            minx, miny, maxx, maxy = gridspec.bounds
+            (mx0, my0) = self._to_metric.transform(minx, miny)
+            (mx1, my1) = self._to_metric.transform(maxx, maxy)
+            mx_min, mx_max = (min(mx0, mx1), max(mx0, mx1))
+            my_min, my_max = (min(my0, my1), max(my0, my1))
+
+            x_edges = np.linspace(mx_min, mx_max, gridspec.nx + 1)
+            y_edges = np.linspace(my_min, my_max, gridspec.ny + 1)
+
+            pxy = np.array([(g.x, g.y) for g in pts_df.geometry.values], dtype=float)
+            if pxy.size == 0:
+                return np.zeros(gridspec.nx * gridspec.ny, dtype=float)
+            px = pxy[:, 0]; py = pxy[:, 1]
+            ix = np.digitize(px, x_edges) - 1
+            iy = np.digitize(py, y_edges) - 1
+            ix = np.clip(ix, 0, gridspec.nx - 1)
+            iy = np.clip(iy, 0, gridspec.ny - 1)
+            flat_idx = ix + iy * gridspec.nx
+
+            counts = np.zeros(gridspec.nx * gridspec.ny, dtype=float)
+            np.add.at(counts, flat_idx, 1.0)
+            return counts
         else:
             raise ValueError(f"Unsupported points mode: {spec.mode}")
 
@@ -211,6 +322,10 @@ class GeoJSONProcessor:
         if spec.weight_property and spec.weight_property in lines_df.columns:
             feat_w = pd.to_numeric(lines_df[spec.weight_property], errors="coerce").fillna(0.0).values
             vals *= feat_w[idxs]
+        # per-value ranks divisor
+        factors = self._divisor_factors(lines_df, spec, idxs)
+        if factors is not None:
+            vals *= factors
         return vals
 
     def _eval_polygons_layer(self, src: GeoSource, gridspec: GridSpec, spec: LayerSpec) -> np.ndarray:
@@ -236,6 +351,10 @@ class GeoJSONProcessor:
             if spec.weight_property and spec.weight_property in polys_df.columns:
                 feat_w = pd.to_numeric(polys_df[spec.weight_property], errors="coerce").fillna(0.0).values
                 vals *= feat_w[idxs]
+            # per-value ranks divisor
+            factors = self._divisor_factors(polys_df, spec, idxs)
+            if factors is not None:
+                vals *= factors
             return vals
 
         elif mode == "boundary":
@@ -247,6 +366,10 @@ class GeoJSONProcessor:
             if spec.weight_property and spec.weight_property in polys_df.columns:
                 feat_w = pd.to_numeric(polys_df[spec.weight_property], errors="coerce").fillna(0.0).values
                 vals *= feat_w[idxs]
+            # per-value ranks divisor
+            factors = self._divisor_factors(polys_df, spec, idxs)
+            if factors is not None:
+                vals *= factors
             return vals
 
         else:

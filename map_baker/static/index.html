@@ -5,7 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GeoJSON Viewer</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="/static/css/styles.css" />
     <style>
+        /* TODO: Inline styles will be removed after full extraction. Styles now live in /static/css/styles.css */
         body, html {
             margin: 0;
             padding: 0;
@@ -156,6 +158,8 @@
             <div id="file-list">Loading...</div>
             <h2>Active Layers</h2>
             <ul id="layer-list"></ul>
+            <h2>Logs</h2>
+            <div id="log-panel" style="max-height:200px; overflow:auto; font-size:12px; background:#ffffff; border:1px solid #ccc; padding:8px; border-radius:4px;"></div>
 
 <!--            &lt;!&ndash; Aggregate Layers Section &ndash;&gt;-->
 <!--            <div class="aggregate-section">-->
@@ -242,18 +246,25 @@
                         <option value="weighted">Weighted</option>
                     </select>
 
-                    <label for="build-weight-property">Weight Property (optional):</label>
-                    <select id="build-weight-property">
-                        <option value="">Choose a property...</option>
+                    <!-- Value weighting (per-value ranks as divisors) -->
+                    <label for="build-weight-by-property">Value Weighting: Property (optional)</label>
+                    <select id="build-weight-by-property">
+                      <option value="">Choose a property...</option>
                     </select>
+                    <div id="weight-ranks-container" style="border: 1px dashed #e6c3b3; padding: 8px; border-radius: 4px; display:none;">
+                      <div style="font-size: 12px; margin-bottom: 6px; color:#7d3200;">
+                        Assign an ordinal rank per value (cell values will be divided by this rank). Default = 1.
+                      </div>
+                      <div id="weight-ranks-list"></div>
+                    </div>
 
-                    <label for="build-filter-property">Filter Property (optional):</label>
-                    <select id="build-filter-property">
-                        <option value="">Choose a property...</option>
+                    <!-- Filter by property with multi-select values -->
+                    <label for="build-filter-property2">Filter by Property (optional)</label>
+                    <select id="build-filter-property2">
+                      <option value="">Choose a property...</option>
                     </select>
-
-                    <label for="build-filter-value">Filter Value:</label>
-                    <input type="text" id="build-filter-value" placeholder="Enter filter value...">
+                    <label for="build-filter-values">Filter Values (multi-select)</label>
+                    <select id="build-filter-values" multiple size="6"></select>
 
                     <label for="build-dataset-weight">Dataset Weight:</label>
                     <input type="number" id="build-dataset-weight" value="1.0" min="0.1" max="10" step="0.1">
@@ -333,9 +344,23 @@
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script type="module" src="/static/js/main.js"></script>
     <script>
         // Initialize map
         const map = L.map('map').setView([-30, 135], 4);
+
+        // Simple log panel helper
+        function logMessage(msg) {
+            const panel = document.getElementById('log-panel');
+            const ts = new Date().toLocaleTimeString();
+            const line = document.createElement('div');
+            line.textContent = `[${ts}] ${msg}`;
+            if (panel) {
+                panel.appendChild(line);
+                panel.scrollTop = panel.scrollHeight;
+            }
+            console.log(msg);
+        }
 
         // Add base tile layer
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -345,23 +370,54 @@
         // Store active layers and available files
         const activeLayers = {};
         let availableFiles = [];
+        let hasFittedOnce = false;
 
         // Fetch available GeoJSON files
         async function fetchFiles() {
             try {
-                const response = await fetch('/api/files');
-                const data = await response.json();
-                availableFiles = data.files;
-                displayFiles(data.files);
+                // Fetch base files
+                const api = window.AppModules?.Api;
+                const baseFiles = api ? await api.fetchFiles() : (await (await fetch('/api/files')).json()).files;
+
+                // Fetch heatmaps list from backend heatmaps folder
+                let heatFiles = [];
+                try {
+                    const heatRes = await fetch('/api/heatmaps');
+                    if (heatRes.ok) {
+                        const heatList = await heatRes.json();
+                        heatFiles = (heatList.files || []).map(h => ({
+                            name: h.name,
+                            path: `heatmaps/${h.name}`,
+                            size: h.size,
+                            directory: 'heatmaps'
+                        }));
+                    }
+                } catch (e) {
+                    console.warn('Unable to fetch heatmaps list:', e);
+                }
+
+                availableFiles = [...baseFiles, ...heatFiles];
+                displayFiles(availableFiles);
                 updateProcessControls();
             } catch (error) {
                 console.error('Error fetching files:', error);
-                document.getElementById('file-list').innerHTML = 'Error loading files.';
+                const fl = document.getElementById('file-list');
+                if (fl) fl.innerHTML = 'Error loading files.';
+                logMessage(`Error fetching files: ${error}`);
             }
         }
 
         // Display files in sidebar
         function displayFiles(files) {
+            const ui = window.AppModules?.UI;
+            if (ui && typeof ui.renderFilesPanel === 'function') {
+                const container = document.getElementById('file-list');
+                ui.renderFilesPanel(container, files, (file) => {
+                    loadAndDisplayFile(file);
+                });
+                return;
+            }
+
             const fileList = document.getElementById('file-list');
             if (files.length === 0) {
                 fileList.innerHTML = 'No GeoJSON files found.';
@@ -395,9 +451,11 @@
 
             fileList.innerHTML = html;
 
-            // Add click event listeners
-            document.querySelectorAll('.file-item').forEach(item => {
-                item.addEventListener('click', handleFileClick);
+            // Event delegation for file items
+            fileList.addEventListener('click', (e) => {
+                const target = e.target.closest('.file-item');
+                if (!target || !fileList.contains(target)) return;
+                handleFileClick({ currentTarget: target });
             });
         }
 
@@ -415,8 +473,9 @@
                 buildSourceSelect.innerHTML = '<option value="">Choose a file...</option>';
             }
 
-            // Add file options
+            // Add file options (exclude heatmaps from processing/build controls)
             availableFiles.forEach(file => {
+                if (file.directory === 'heatmaps') return; // skip generated heatmaps
                 const optionHtml = `<option value="${file.path}" data-dir="${file.directory}" data-name="${file.name}">${file.name} (${file.directory})</option>`;
                 if (fileSelect) {
                     fileSelect.innerHTML += optionHtml;
@@ -505,6 +564,8 @@
 
         // Process GeoJSON function
         async function processGeoJSON() {
+            // Deprecated for auto heatmap flow, still usable if UI is visible
+            logMessage('Process button clicked.');
             const filePathElement = document.getElementById('process-file');
             const gridSizeElement = document.getElementById('process-grid-size');
             const weightPropertyElement = document.getElementById('process-weight-property');
@@ -581,13 +642,19 @@
                         // Add processed data to map
                         addLayerToMap(layerName, processedData);
 
-                        console.log(`Successfully processed ${fileName} into heatmap with ${processedData.features.length} points`);
+                        // Log stats
+                        const values = processedData.features.map(f => f.properties.value || 0);
+                        const minV = Math.min(...values);
+                        const maxV = Math.max(...values);
+                        const avgV = values.reduce((a,b)=>a+b,0) / (values.length || 1);
+                        logMessage(`Processed ${fileName} -> grid=${gridSize}, weight=${weightProperty||'none'}, filter=${filterPropertyJSON||'none'} | cells=${values.length}, min=${minV.toFixed(3)}, max=${maxV.toFixed(3)}, avg=${avgV.toFixed(3)}`);
                     }
                 }
 
             } catch (error) {
                 console.error('Error processing GeoJSON:', error);
                 alert(`Error processing GeoJSON: ${error.message}`);
+                logMessage(`Error processing via UI: ${error.message}`);
             } finally {
                 // Hide loading indicator
                 if (loadingIndicator) {
@@ -602,9 +669,37 @@
 
         // Format file size
         function formatFileSize(bytes) {
+            const mod = window.AppModules?.Utils;
+            if (mod && typeof mod.formatFileSize === 'function') {
+                return mod.formatFileSize(bytes);
+            }
             if (bytes < 1024) return bytes + ' B';
             if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
             return (bytes / 1048576).toFixed(1) + ' MB';
+        }
+
+        // Load and display a file, deciding endpoint and styling by folder
+        async function loadAndDisplayFile(file) {
+            try {
+                let url;
+                let isHeat = false;
+                if (file.directory === 'heatmaps') {
+                    url = `/api/heatmaps/${encodeURIComponent(file.name)}`;
+                    isHeat = true;
+                    logMessage(`Loading heatmap '${file.name}' from heatmaps folder`);
+                } else {
+                    url = `/api/files/${encodeURIComponent(file.directory)}/${encodeURIComponent(file.name)}`;
+                    logMessage(`Loading '${file.name}' from ${file.directory}`);
+                }
+                const res = await fetch(url);
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+                addLayerToMap(file.name, data, { isHeat });
+                const n = (data.features && data.features.length) || 0;
+                logMessage(`Rendered '${file.name}' with ${n} features`);
+            } catch (e) {
+                logMessage(`Error loading '${file.name}': ${e.message}`);
+            }
         }
 
         // Handle file click
@@ -614,65 +709,51 @@
             const dirName = fileItem.dataset.dir;
             const filePath = fileItem.dataset.path;
 
-            try {
-                // Fetch GeoJSON data
-                const response = await fetch(`/api/files/${dirName}/${fileName}`);
-                const geojsonData = await response.json();
-
-                // Add to map
-                addLayerToMap(fileName, geojsonData);
-
-            } catch (error) {
-                console.error('Error loading GeoJSON:', error);
-                alert(`Error loading ${fileName}`);
-            }
+            await loadAndDisplayFile({ path: filePath, name: fileName, directory: dirName, dir: dirName });
         }
 
-        // Add layer to map
-        function addLayerToMap(name, geojsonData) {
+        // Add layer to map (conditional styling by source folder)
+        function addLayerToMap(name, geojsonData, opts = {}) {
+            const isHeat = !!opts.isHeat;
+            // Log what is being added
+            logMessage(`Rendering layer '${name}' with ${geojsonData.features ? geojsonData.features.length : 0} features`);
             // Remove existing layer with same name if it exists
             if (activeLayers[name]) {
                 map.removeLayer(activeLayers[name].layer);
             }
 
-            // Generate random color
-            const color = getRandomColor();
+            const features = geojsonData.features || [];
+            const maxValue = isHeat ? Math.max(1, ...features.map(f => (f.properties && (f.properties.value || 0)) || 0)) : 1;
+            const normColor = isHeat ? null : colorFromName(name);
 
             // Create layer with appropriate styling
             const layer = L.geoJSON(geojsonData, {
                 style: function(feature) {
-                    // Special styling for processed heatmap data
-                    if (name.includes('_processed_heatmap')) {
-                        const value = feature.properties.value || 0;
-                        const maxValue = Math.max(...geojsonData.features.map(f => f.properties.value || 0));
-                        const normalizedValue = value / maxValue;
+                    if (isHeat) {
+                        const value = (feature.properties && (feature.properties.value || 0)) || 0;
+                        const normalizedValue = maxValue ? value / maxValue : 0;
                         const gradientColor = getColorFromGradient(normalizedValue);
-
                         return {
                             color: '#000',  // Black border
                             weight: 1,
                             opacity: 1,
-                            fillOpacity: Math.max(0.3, normalizedValue * 0.7 + 0.3),  // Min opacity 0.3, max 1.0
+                            fillOpacity: Math.max(0.3, normalizedValue * 0.7 + 0.3),
                             fillColor: gradientColor
                         };
                     }
-
                     return {
-                        color: color,
+                        color: normColor,
                         weight: 2,
                         opacity: 1,
                         fillOpacity: 0.5
                     };
                 },
                 pointToLayer: function(feature, latlng) {
-                    // Special styling for processed heatmap points
-                    if (name.includes('_processed_heatmap')) {
-                        const value = feature.properties.value || 0;
-                        const maxValue = Math.max(...geojsonData.features.map(f => f.properties.value || 0));
-                        const normalizedValue = value / maxValue;
+                    if (isHeat) {
+                        const value = (feature.properties && (feature.properties.value || 0)) || 0;
+                        const normalizedValue = maxValue ? value / maxValue : 0;
                         const radius = Math.max(3, normalizedValue * 15);
                         const gradientColor = getColorFromGradient(normalizedValue);
-
                         return L.circleMarker(latlng, {
                             radius: radius,
                             fillColor: gradientColor,
@@ -682,10 +763,9 @@
                             fillOpacity: 0.8
                         });
                     }
-
                     return L.circleMarker(latlng, {
                         radius: 8,
-                        fillColor: color,
+                        fillColor: normColor,
                         color: '#000',
                         weight: 1,
                         opacity: 1,
@@ -706,19 +786,90 @@
 
             // Store layer
             activeLayers[name] = {
-                layer: layer,
-                color: color
+                layer: layer
             };
 
             // Update layer list
             updateLayerList();
 
-            // Fit map to layer bounds
-            map.fitBounds(layer.getBounds());
+            // Fit map to layer bounds only once to avoid disrupting user view
+            if (!hasFittedOnce) {
+                try { map.fitBounds(layer.getBounds()); } catch (e) { /* ignore */ }
+                hasFittedOnce = true;
+            }
+        }
+
+        // Helper: generate heatmap for a file using backend /api/process, then load from heatmaps folder
+        async function generateHeatmapForFile(file, options = {}) {
+            const gridSize = options.gridSize || 50;
+            const weightProperty = options.weightProperty || '';
+            const filterObj = options.filter || null;
+            let filterPropertyJSON = filterObj ? JSON.stringify(filterObj) : null;
+
+            try {
+                logMessage(`Generating heatmap for ${file.name} (grid=${gridSize}, weight=${weightProperty || 'none'}${filterPropertyJSON ? ", filter=" + filterPropertyJSON : ''})`);
+                const params = new URLSearchParams({
+                    file_path: file.path,
+                    grid_size: String(gridSize)
+                });
+                if (weightProperty) params.append('weight_property', weightProperty);
+                if (filterPropertyJSON) params.append('filter_property', filterPropertyJSON);
+                const response = await fetch(`/api/process?${params.toString()}`);
+                if (!response.ok) {
+                    const err = await response.json().catch(() => ({}));
+                    throw new Error(err.detail || `HTTP ${response.status}`);
+                }
+                // Backend saved to heatmaps folder. Determine saved filename and fetch from /api/heatmaps
+                const dot = file.name.lastIndexOf('.');
+                const base = dot >= 0 ? file.name.slice(0, dot) : file.name;
+                const ext = dot >= 0 ? file.name.slice(dot) : '.geojson';
+                const savedName = `${base}_processed${ext}`;
+
+                const savedRes = await fetch(`/api/heatmaps/${encodeURIComponent(savedName)}`);
+                if (!savedRes.ok) throw new Error(`Fetch saved heatmap HTTP ${savedRes.status}`);
+                const processedData = await savedRes.json();
+                const layerName = savedName;
+                addLayerToMap(layerName, processedData, { isHeat: true });
+                // Stats
+                const values = processedData.features.map(f => f.properties.value || 0);
+                const minV = Math.min(...values);
+                const maxV = Math.max(...values);
+                const avgV = values.reduce((a,b)=>a+b,0) / (values.length || 1);
+                logMessage(`Completed ${file.name}: cells=${values.length}, min=${minV.toFixed(3)}, max=${maxV.toFixed(3)}, avg=${avgV.toFixed(3)}`);
+            } catch (e) {
+                logMessage(`Error generating heatmap for ${file.name}: ${e.message}`);
+            }
+        }
+
+        // Auto-generate a default heatmap on load
+        function autoGenerateDefaultHeatmap() {
+            if (!availableFiles || availableFiles.length === 0) return;
+            let file = availableFiles.find(f => /Major_Power_Stations/i.test(f.name)) || availableFiles[0];
+            logMessage(`Auto-selecting '${file.name}' for initial heatmap.`);
+            generateHeatmapForFile(file, { gridSize: 50 });
         }
 
         // Update layer list in sidebar
         function updateLayerList() {
+            const ui = window.AppModules?.UI;
+            if (ui && typeof ui.renderLayersPanel === 'function') {
+                const container = document.getElementById('layer-list');
+                ui.renderLayersPanel(container, activeLayers, {
+                    onToggle: (name, checked) => {
+                        const lyr = activeLayers[name]?.layer;
+                        if (!lyr) return;
+                        if (checked) { map.addLayer(lyr); } else { map.removeLayer(lyr); }
+                    },
+                    onRemove: (name) => {
+                        const lyr = activeLayers[name]?.layer;
+                        if (lyr) { map.removeLayer(lyr); }
+                        delete activeLayers[name];
+                        updateLayerList();
+                    }
+                });
+                return;
+            }
+
             const layerList = document.getElementById('layer-list');
             let html = '';
 
@@ -739,14 +890,20 @@
 
             layerList.innerHTML = html;
 
-            // Add event listeners
-            document.querySelectorAll('input[type="checkbox"][id^="layer-"]').forEach(checkbox => {
-                checkbox.addEventListener('change', toggleLayerVisibility);
-            });
-
-            document.querySelectorAll('.remove-layer').forEach(button => {
-                button.addEventListener('click', removeLayer);
-            });
+            // Event delegation for visibility and removal
+            layerList.onclick = (e) => {
+                const removeBtn = e.target.closest('.remove-layer');
+                if (removeBtn && layerList.contains(removeBtn)) {
+                    removeLayer({ target: removeBtn });
+                    return;
+                }
+            };
+            layerList.onchange = (e) => {
+                const cb = e.target.closest('input[type=\"checkbox\"][id^=\"layer-\"]');
+                if (cb && layerList.contains(cb)) {
+                    toggleLayerVisibility({ target: cb });
+                }
+            };
         }
 
         // Toggle layer visibility
@@ -775,18 +932,20 @@
             }
         }
 
-        // Generate random color
-        function getRandomColor() {
-            const letters = '0123456789ABCDEF';
-            let color = '#';
-            for (let i = 0; i < 6; i++) {
-                color += letters[Math.floor(Math.random() * 16)];
+        // Deterministic color from layer name
+        function colorFromName(name) {
+            let h = 0;
+            for (let i = 0; i < name.length; i++) {
+                h = (h * 31 + name.charCodeAt(i)) | 0;
             }
-            return color;
+            const hue = Math.abs(h) % 360;
+            return `hsl(${hue} 70% 50%)`;
         }
 
         // Generate color from gradient based on value (0-1)
         function getColorFromGradient(value) {
+            // Clamp
+            const v = Math.max(0, Math.min(1, value || 0));
             // Define gradient colors (from blue to red)
             const colors = [
                 {value: 0, color: [0, 0, 255]},    // Blue for low values
@@ -1179,59 +1338,123 @@
 
         // Update property options for build layer
         async function updateBuildPropertyOptions(filePath, selectedOption) {
-            const weightSelect = document.getElementById('build-weight-property');
-            const filterSelect = document.getElementById('build-filter-property');
+            const weightSelect = document.getElementById('build-weight-property'); // legacy (may not exist)
+            const filterSelect = document.getElementById('build-filter-property'); // legacy (may not exist)
+            const weightByPropSelect = document.getElementById('build-weight-by-property');
+            const filterProp2Select = document.getElementById('build-filter-property2');
+            const filterValuesSelect = document.getElementById('build-filter-values');
+            const weightRanksContainer = document.getElementById('weight-ranks-container');
+            const weightRanksList = document.getElementById('weight-ranks-list');
 
-            // Check if elements exist before setting innerHTML
-            if (weightSelect) {
-                weightSelect.innerHTML = '<option value="">Choose a property...</option>';
-            }
+            // Reset
+            if (weightSelect) weightSelect.innerHTML = '<option value="">Choose a property...</option>';
+            if (filterSelect) filterSelect.innerHTML = '<option value="">Choose a property...</option>';
+            if (weightByPropSelect) weightByPropSelect.innerHTML = '<option value="">Choose a property...</option>';
+            if (filterProp2Select) filterProp2Select.innerHTML = '<option value="">Choose a property...</option>';
+            if (filterValuesSelect) filterValuesSelect.innerHTML = '';
+            if (weightRanksList) weightRanksList.innerHTML = '';
+            if (weightRanksContainer) weightRanksContainer.style.display = 'none';
 
-            if (filterSelect) {
-                filterSelect.innerHTML = '<option value="">Choose a property...</option>';
-            }
-
-            if (filePath && selectedOption && weightSelect && filterSelect) {
+            if (filePath && selectedOption) {
                 try {
-                    const directory = selectedOption.dataset.dir;
-                    const filename = selectedOption.dataset.name;
+                    // Prefer backend endpoints to compute distinct property names
+                    const propsResp = await fetch(`/api/properties?file_path=${encodeURIComponent(filePath)}`);
+                    const propsData = await propsResp.json();
+                    const props = propsData.properties || [];
 
-                    // Fetch the GeoJSON file to analyze properties
-                    const response = await fetch(`/api/files/${directory}/${filename}`);
-                    const geojsonData = await response.json();
-
-                    const properties = new Set();
-                    const numericProperties = new Set();
-
-                    // Extract properties from features
-                    if (geojsonData.features && geojsonData.features.length > 0) {
-                        geojsonData.features.forEach(feature => {
-                            if (feature.properties) {
-                                Object.entries(feature.properties).forEach(([prop, value]) => {
-                                    properties.add(prop);
-                                    if (typeof value === 'number' && !isNaN(value)) {
-                                        numericProperties.add(prop);
-                                    }
-                                });
-                            }
-                        });
+                    // Also determine numeric properties by peeking first feature via existing file fetch
+                    const directory = selectedOption?.dataset?.dir;
+                    const filename = selectedOption?.dataset?.name;
+                    if (directory && filename) {
+                        const response = await fetch(`/api/files/${directory}/${filename}`);
+                        const geojsonData = await response.json();
+                        const numericProperties = new Set();
+                        if (geojsonData.features && geojsonData.features.length > 0) {
+                            geojsonData.features.forEach(feature => {
+                                if (feature.properties) {
+                                    Object.entries(feature.properties).forEach(([prop, value]) => {
+                                        if (typeof value === 'number' && !isNaN(value)) {
+                                            numericProperties.add(prop);
+                                        }
+                                    });
+                                }
+                            });
+                        }
+                        // Add numeric properties to legacy weight select (if present)
+                        if (weightSelect) {
+                            numericProperties.forEach(prop => {
+                                weightSelect.innerHTML += `<option value="${prop}">${prop}</option>`;
+                            });
+                        }
                     }
 
-                    // Add numeric properties to weight select
-                    numericProperties.forEach(prop => {
-                        weightSelect.innerHTML += `<option value="${prop}">${prop}</option>`;
+                    // Add all properties to both filter and new selectors
+                    props.forEach(prop => {
+                        if (filterSelect) {
+                            filterSelect.innerHTML += `<option value="${prop}">${prop}</option>`;
+                        }
+                        if (weightByPropSelect) {
+                            weightByPropSelect.innerHTML += `<option value="${prop}">${prop}</option>`;
+                        }
+                        if (filterProp2Select) {
+                            filterProp2Select.innerHTML += `<option value="${prop}">${prop}</option>`;
+                        }
                     });
-
-                    // Add all properties to filter select
-                    properties.forEach(prop => {
-                        filterSelect.innerHTML += `<option value="${prop}">${prop}</option>`;
-                    });
-
                 } catch (error) {
                     console.error('Error analyzing GeoJSON properties:', error);
                 }
             }
         }
+
+        // When weight-by-property changes, fetch values and render rank inputs
+        document.getElementById('build-weight-by-property')?.addEventListener('change', async (e) => {
+            const prop = e.target.value;
+            const weightRanksContainer = document.getElementById('weight-ranks-container');
+            const weightRanksList = document.getElementById('weight-ranks-list');
+            if (weightRanksList) weightRanksList.innerHTML = '';
+            if (!prop) { if (weightRanksContainer) weightRanksContainer.style.display = 'none'; return; }
+            const src = document.getElementById('build-source-id');
+            const opt = src?.selectedOptions?.[0];
+            if (!opt) return;
+            const filePath = opt.value;
+            const resp = await fetch(`/api/property-values?file_path=${encodeURIComponent(filePath)}&property=${encodeURIComponent(prop)}`);
+            const data = await resp.json();
+            const values = data.values || [];
+            if (weightRanksContainer) weightRanksContainer.style.display = 'block';
+            values.forEach(v => {
+                const id = `rank-${prop}-${String(v).replace(/[^a-zA-Z0-9_-]/g,'_')}`;
+                const row = document.createElement('div');
+                row.style.display = 'flex';
+                row.style.alignItems = 'center';
+                row.style.gap = '8px';
+                row.innerHTML = `
+                  <label style="flex:1;">${v}</label>
+                  <input type="number" id="${id}" data-val="${v}" min="1" step="1" value="1" style="width:90px;" />
+                `;
+                weightRanksList.appendChild(row);
+            });
+        });
+
+        // Filter property multi-select values
+        document.getElementById('build-filter-property2')?.addEventListener('change', async (e) => {
+            const prop = e.target.value;
+            const filterValuesSelect = document.getElementById('build-filter-values');
+            if (filterValuesSelect) filterValuesSelect.innerHTML = '';
+            if (!prop) return;
+            const src = document.getElementById('build-source-id');
+            const opt = src?.selectedOptions?.[0];
+            if (!opt) return;
+            const filePath = opt.value;
+            const resp = await fetch(`/api/property-values?file_path=${encodeURIComponent(filePath)}&property=${encodeURIComponent(prop)}`);
+            const data = await resp.json();
+            const values = data.values || [];
+            values.forEach(v => {
+                const optEl = document.createElement('option');
+                optEl.value = v;
+                optEl.textContent = v;
+                filterValuesSelect.appendChild(optEl);
+            });
+        });
 
         // Update property options for multi-layer
         async function updateMultiLayerPropertyOptions(filePath, layerId) {
@@ -1360,10 +1583,20 @@
                 }
             }
 
-            // Prepare filter property as JSON object if both property and value are provided
+            // Prepare filter property as JSON object
             let filterPropertyObj = null;
-            if (filterProperty && filterValue) {
-                filterPropertyObj = {[filterProperty]: filterValue};
+            // New multi-select filter takes precedence if chosen
+            const filterProp2Select = document.getElementById('build-filter-property2');
+            const filterValuesSelect = document.getElementById('build-filter-values');
+            const filterProp2 = filterProp2Select ? filterProp2Select.value : '';
+            if (filterProp2) {
+                const selVals = [...(filterValuesSelect?.selectedOptions || [])].map(o => o.value);
+                if (selVals.length > 0) {
+                    filterPropertyObj = { [filterProp2]: selVals };
+                }
+            } else if (filterProperty && filterValue) {
+                // Legacy single-value filter
+                filterPropertyObj = { [filterProperty]: filterValue };
             }
 
             // Show loading indicator
@@ -1379,6 +1612,23 @@
             }
 
             try {
+                // Collect per-value rank divisors
+                const weightByPropSelect = document.getElementById('build-weight-by-property');
+                const weightRanksList = document.getElementById('weight-ranks-list');
+                let weightByProperty = weightByPropSelect ? weightByPropSelect.value : '';
+                if (weightByProperty === '') weightByProperty = null;
+                let weightRanks = null;
+                if (weightByProperty && weightRanksList) {
+                    weightRanks = {};
+                    [...(weightRanksList.querySelectorAll('input[type="number"]') || [])].forEach(inp => {
+                        const v = inp.getAttribute('data-val');
+                        const r = parseFloat(inp.value);
+                        if (!isNaN(r) && r > 0) {
+                            weightRanks[String(v)] = r;
+                        }
+                    });
+                }
+
                 // Prepare request body
                 const requestBody = {
                     layer: {
@@ -1392,7 +1642,10 @@
                         decay_params: decayParams,
                         k: k,
                         mask_value: maskValue,
-                        output_filename: outputFilename
+                        output_filename: outputFilename,
+                        // NEW
+                        weight_by_property: weightByProperty,
+                        weight_ranks: weightRanks
                     },
                     grid_size: gridSize
                 };
@@ -1420,12 +1673,17 @@
                 const newFile = availableFiles.find(file => file.name === outputFilename);
 
                 if (newFile) {
-                    // Load the new file
-                    const fileResponse = await fetch(`/api/files/${newFile.directory}/${newFile.name}`);
+                    // Load the new file using the correct endpoint
+                    let fileResponse;
+                    if (newFile.directory === 'heatmaps') {
+                        fileResponse = await fetch(`/api/heatmaps/${encodeURIComponent(newFile.name)}`);
+                    } else {
+                        fileResponse = await fetch(`/api/files/${encodeURIComponent(newFile.directory)}/${encodeURIComponent(newFile.name)}`);
+                    }
                     const geojsonData = await fileResponse.json();
 
-                    // Add to map
-                    addLayerToMap(newFile.name, geojsonData);
+                    // Add to map (use isHeat for heatmaps)
+                    addLayerToMap(newFile.name, geojsonData, { isHeat: newFile.directory === 'heatmaps' });
 
                     console.log(`Successfully built layer: ${outputFilename}`);
                 } else {
@@ -1604,12 +1862,17 @@
                 const newFile = availableFiles.find(file => file.name === outputFilename);
 
                 if (newFile) {
-                    // Load the new file
-                    const fileResponse = await fetch(`/api/files/${newFile.directory}/${newFile.name}`);
+                    // Load the new file using the correct endpoint
+                    let fileResponse;
+                    if (newFile.directory === 'heatmaps') {
+                        fileResponse = await fetch(`/api/heatmaps/${encodeURIComponent(newFile.name)}`);
+                    } else {
+                        fileResponse = await fetch(`/api/files/${encodeURIComponent(newFile.directory)}/${encodeURIComponent(newFile.name)}`);
+                    }
                     const geojsonData = await fileResponse.json();
 
-                    // Add to map
-                    addLayerToMap(newFile.name, geojsonData);
+                    // Add to map (use isHeat for heatmaps)
+                    addLayerToMap(newFile.name, geojsonData, { isHeat: newFile.directory === 'heatmaps' });
 
                     console.log(`Successfully built multi-layer: ${outputFilename}`);
                 } else {
