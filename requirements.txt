@@ -9,6 +9,12 @@ pandas==2.3.2
 pydeck==0.9.1
 requests==2.32.5
 maplibre==0.3.5
+matplotlib==3.10.6
+
+# FastAPI and related dependencies
+fastapi==0.110.0
+uvicorn==0.29.0
+pydantic==2.7.1
 
 # Geospatial stack
 # geopandas depends on shapely and either pyogrio or fiona/GDAL for IO.

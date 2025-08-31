@@ -1,0 +1,1901 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GeoJSON Viewer</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="/static/css/styles.css" />
+    <style>
+        /* TODO: Inline styles will be removed after full extraction. Styles now live in /static/css/styles.css */
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            font-family: Arial, sans-serif;
+        }
+        .container {
+            display: flex;
+            height: 100%;
+        }
+        .sidebar {
+            width: 300px;
+            padding: 20px;
+            background-color: #f5f5f5;
+            overflow-y: auto;
+        }
+        .map-container {
+            flex-grow: 1;
+        }
+        #map {
+            height: 100%;
+        }
+        h1 {
+            font-size: 24px;
+            margin-top: 0;
+        }
+        h2 {
+            font-size: 18px;
+            margin-top: 20px;
+        }
+        ul {
+            list-style-type: none;
+            padding: 0;
+        }
+        li {
+            margin-bottom: 10px;
+        }
+        .file-item {
+            cursor: pointer;
+            padding: 8px;
+            border-radius: 4px;
+        }
+        .file-item:hover {
+            background-color: #e0e0e0;
+        }
+        .active {
+            background-color: #d0d0d0;
+        }
+        .layer-control {
+            margin-top: 5px;
+            display: flex;
+            align-items: center;
+        }
+        .color-picker {
+            margin-left: 10px;
+            width: 20px;
+            height: 20px;
+            border: none;
+            padding: 0;
+        }
+        .process-section {
+            margin-top: 30px;
+            padding: 15px;
+            background-color: #f0f8e8;
+            border-radius: 8px;
+            border: 1px solid #c3e6c3;
+        }
+        .process-controls {
+            margin-bottom: 15px;
+        }
+        .process-controls label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #2d5a2d;
+        }
+        .process-controls select,
+        .process-controls input {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 10px;
+            border: 1px solid #a8d4a8;
+            border-radius: 4px;
+            background-color: white;
+        }
+        .process-controls input[type="number"] {
+            background-color: #fafffe;
+        }
+        .process-button {
+            background-color: #28a745;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            width: 100%;
+            transition: background-color 0.3s;
+        }
+        .process-button:hover {
+            background-color: #218838;
+        }
+        .process-button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        .process-loading {
+            display: none;
+            text-align: center;
+            color: #28a745;
+            font-style: italic;
+            margin-top: 10px;
+        }
+        .process-info {
+            margin-top: 10px;
+            padding: 8px;
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            border-radius: 4px;
+            font-size: 12px;
+            color: #155724;
+        }
+        .aggregate-select {
+            margin-left: 10px;
+        }
+        .aggregate-label {
+            font-size: 12px;
+            background-color: #e2f0d9;
+            padding: 2px 5px;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        .aggregate-section {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #e8f4ff;
+            border-radius: 8px;
+            border: 1px solid #b8daff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="sidebar">
+            <h1>GeoJSON Viewer</h1>
+            <h2>Available Files</h2>
+            <div id="file-list">Loading...</div>
+            <h2>Active Layers</h2>
+            <ul id="layer-list"></ul>
+            <h2>Logs</h2>
+            <div id="log-panel" style="max-height:200px; overflow:auto; font-size:12px; background:#ffffff; border:1px solid #ccc; padding:8px; border-radius:4px;"></div>
+
+<!--            &lt;!&ndash; Aggregate Layers Section &ndash;&gt;-->
+<!--            <div class="aggregate-section">-->
+<!--                <h2>🔄 Aggregate Layers</h2>-->
+<!--                <div class="process-controls">-->
+<!--                    <label for="aggregate-grid-size">Grid Size:</label>-->
+<!--                    <input type="number" id="aggregate-grid-size" value="50" min="10" max="200">-->
+
+<!--                    <p>Select layers for aggregation by checking the "Agg" checkbox next to each layer above.</p>-->
+<!--                </div>-->
+
+<!--                <button class="process-button" id="aggregate-layers-btn" onclick="aggregateLayers()">-->
+<!--                    Aggregate Selected Layers-->
+<!--                </button>-->
+
+<!--                <div class="process-loading" id="aggregate-loading" style="display: none;">-->
+<!--                    Aggregating layers...-->
+<!--                </div>-->
+
+<!--                <div class="process-info">-->
+<!--                    <strong>Info:</strong> This will combine selected layers into a single heatmap, with each layer contributing to the final result.-->
+<!--                </div>-->
+<!--            </div>-->
+
+<!--            &lt;!&ndash; Process Section &ndash;&gt;-->
+<!--            <div class="process-section">-->
+<!--                <h2>🔧 Process GeoJSON</h2>-->
+<!--                <div class="process-controls">-->
+<!--                    <label for="process-file">Select File to Process:</label>-->
+<!--                    <select id="process-file">-->
+<!--                        <option value="">Choose a file...</option>-->
+<!--                    </select>-->
+
+<!--                    <label for="process-grid-size">Grid Size:</label>-->
+<!--                    <input type="number" id="process-grid-size" value="50" min="10" max="200">-->
+
+<!--                    <label for="process-weight-property">Weight Property (optional):</label>-->
+<!--                    <select id="process-weight-property">-->
+<!--                        <option value="">Choose a property...</option>-->
+<!--                    </select>-->
+
+<!--                    <label for="process-filter-property">Filter Property (optional):</label>-->
+<!--                    <select id="process-filter-property">-->
+<!--                        <option value="">Choose a property...</option>-->
+<!--                    </select>-->
+
+<!--                    <label for="process-filter-value">Filter Value:</label>-->
+<!--                    <input type="text" id="process-filter-value" placeholder="Enter filter value...">-->
+<!--                </div>-->
+
+<!--                <button class="process-button" id="process-geojson-btn" onclick="processGeoJSON()">-->
+<!--                    Process & Generate Heatmap-->
+<!--                </button>-->
+
+<!--                <div class="process-loading" id="process-loading">-->
+<!--                    Processing GeoJSON file...-->
+<!--                </div>-->
+
+<!--                <div class="process-info">-->
+<!--                    <strong>Info:</strong> This will generate a grid-based heatmap from the selected GeoJSON file using the backend processor.-->
+<!--                </div>-->
+<!--            </div>-->
+
+            <!-- Build Layer Section -->
+            <div class="process-section" style="background-color: #f8f0e8; border-color: #e6c3c3;">
+                <h2>🏗️ Build Layer</h2>
+                <div class="process-controls">
+                    <label for="build-source-id">Source ID (File):</label>
+                    <select id="build-source-id">
+                        <option value="">Choose a file...</option>
+                    </select>
+
+                    <label for="build-geometry-type">Geometry Type:</label>
+                    <select id="build-geometry-type">
+                        <option value="point">Point</option>
+                        <option value="line">Line</option>
+                        <option value="polygon">Polygon</option>
+                    </select>
+
+                    <label for="build-mode">Mode:</label>
+                    <select id="build-mode">
+                        <option value="density">Density</option>
+                        <option value="count">Count</option>
+                        <option value="weighted">Weighted</option>
+                    </select>
+
+                    <!-- Value weighting (per-value ranks as divisors) -->
+                    <label for="build-weight-by-property">Value Weighting: Property (optional)</label>
+                    <select id="build-weight-by-property">
+                      <option value="">Choose a property...</option>
+                    </select>
+                    <div id="weight-ranks-container" style="border: 1px dashed #e6c3b3; padding: 8px; border-radius: 4px; display:none;">
+                      <div style="font-size: 12px; margin-bottom: 6px; color:#7d3200;">
+                        Assign an ordinal rank per value (cell values will be divided by this rank). Default = 1.
+                      </div>
+                      <div id="weight-ranks-list"></div>
+                    </div>
+
+                    <!-- Filter by property with multi-select values -->
+                    <label for="build-filter-property2">Filter by Property (optional)</label>
+                    <select id="build-filter-property2">
+                      <option value="">Choose a property...</option>
+                    </select>
+                    <label for="build-filter-values">Filter Values (multi-select)</label>
+                    <select id="build-filter-values" multiple size="6"></select>
+
+                    <label for="build-dataset-weight">Dataset Weight:</label>
+                    <input type="number" id="build-dataset-weight" value="1.0" min="0.1" max="10" step="0.1">
+
+                    <label for="build-decay">Decay Function:</label>
+                    <select id="build-decay">
+                        <option value="exp">Exponential</option>
+                        <option value="inv">Inverse</option>
+                        <option value="linear">Linear Cutoff</option>
+                    </select>
+
+                    <div id="decay-params-container">
+                        <!-- Decay parameters will be added dynamically based on selected decay function -->
+                    </div>
+
+                    <label for="build-k">K Value (Neighbors):</label>
+                    <input type="number" id="build-k" value="8" min="1" max="20">
+
+                    <label for="build-mask-value">Mask Value:</label>
+                    <input type="number" id="build-mask-value" value="1.0" min="0" max="10" step="0.1">
+
+                    <label for="build-grid-size">Grid Size:</label>
+                    <input type="number" id="build-grid-size" value="50" min="10" max="200">
+
+                    <label for="build-output-filename">Output Filename:</label>
+                    <input type="text" id="build-output-filename" value="custom_layer.geojson">
+                </div>
+
+                <button class="process-button" id="build-layer-btn" onclick="buildLayer()" style="background-color: #d35400;">
+                    Build Layer
+                </button>
+
+                <div class="process-loading" id="build-loading" style="display: none; color: #d35400;">
+                    Building layer...
+                </div>
+
+                <div class="process-info" style="background-color: #f9e2d2; border-color: #e6c3b3; color: #7d3200;">
+                    <strong>Info:</strong> This will build a custom layer using the advanced engine functionality.
+                </div>
+            </div>
+
+<!--            &lt;!&ndash; Build Multi-Layer Section &ndash;&gt;-->
+<!--            <div class="process-section" style="background-color: #e8f0ff; border-color: #b3c6e6;">-->
+<!--                <h2>🔄 Build Multi-Layer</h2>-->
+<!--                <div class="process-controls">-->
+<!--                    <div id="multi-layer-list">-->
+<!--                        &lt;!&ndash; Layer configurations will be added here &ndash;&gt;-->
+<!--                    </div>-->
+
+<!--                    <button type="button" id="add-layer-btn" onclick="addLayerConfig()" style="background-color: #3498db; color: white; padding: 8px 16px; border: none; border-radius: 4px; margin: 10px 0; cursor: pointer;">-->
+<!--                        + Add Layer-->
+<!--                    </button>-->
+
+<!--                    <label for="multi-grid-size">Grid Size:</label>-->
+<!--                    <input type="number" id="multi-grid-size" value="50" min="10" max="200">-->
+
+<!--                    <label for="multi-output-filename">Output Filename:</label>-->
+<!--                    <input type="text" id="multi-output-filename" value="multi_layer.geojson">-->
+<!--                </div>-->
+
+<!--                <button class="process-button" id="build-multi-layer-btn" onclick="buildMultiLayer()" style="background-color: #2980b9;">-->
+<!--                    Build Multi-Layer-->
+<!--                </button>-->
+
+<!--                <div class="process-loading" id="multi-build-loading" style="display: none; color: #2980b9;">-->
+<!--                    Building multi-layer...-->
+<!--                </div>-->
+
+<!--                <div class="process-info" style="background-color: #d4e6f9; border-color: #b3c6e6; color: #1a5276;">-->
+<!--                    <strong>Info:</strong> This will build and combine multiple layers using the advanced engine functionality.-->
+<!--                </div>-->
+<!--            </div>-->
+        </div>
+        <div class="map-container">
+            <div id="map"></div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script type="module" src="/static/js/main.js"></script>
+    <script>
+        // Initialize map
+        const map = L.map('map').setView([-30, 135], 4);
+
+        // Simple log panel helper
+        function logMessage(msg) {
+            const panel = document.getElementById('log-panel');
+            const ts = new Date().toLocaleTimeString();
+            const line = document.createElement('div');
+            line.textContent = `[${ts}] ${msg}`;
+            if (panel) {
+                panel.appendChild(line);
+                panel.scrollTop = panel.scrollHeight;
+            }
+            console.log(msg);
+        }
+
+        // Add base tile layer
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+
+        // Store active layers and available files
+        const activeLayers = {};
+        let availableFiles = [];
+        let hasFittedOnce = false;
+
+        // Fetch available GeoJSON files
+        async function fetchFiles() {
+            try {
+                // Fetch base files
+                const api = window.AppModules?.Api;
+                const baseFiles = api ? await api.fetchFiles() : (await (await fetch('/api/files')).json()).files;
+
+                // Fetch heatmaps list from backend heatmaps folder
+                let heatFiles = [];
+                try {
+                    const heatRes = await fetch('/api/heatmaps');
+                    if (heatRes.ok) {
+                        const heatList = await heatRes.json();
+                        heatFiles = (heatList.files || []).map(h => ({
+                            name: h.name,
+                            path: `heatmaps/${h.name}`,
+                            size: h.size,
+                            directory: 'heatmaps'
+                        }));
+                    }
+                } catch (e) {
+                    console.warn('Unable to fetch heatmaps list:', e);
+                }
+
+                availableFiles = [...baseFiles, ...heatFiles];
+                displayFiles(availableFiles);
+                updateProcessControls();
+            } catch (error) {
+                console.error('Error fetching files:', error);
+                const fl = document.getElementById('file-list');
+                if (fl) fl.innerHTML = 'Error loading files.';
+                logMessage(`Error fetching files: ${error}`);
+            }
+        }
+
+        // Display files in sidebar
+        function displayFiles(files) {
+            const ui = window.AppModules?.UI;
+            if (ui && typeof ui.renderFilesPanel === 'function') {
+                const container = document.getElementById('file-list');
+                ui.renderFilesPanel(container, files, (file) => {
+                    loadAndDisplayFile(file);
+                });
+                return;
+            }
+
+            const fileList = document.getElementById('file-list');
+            if (files.length === 0) {
+                fileList.innerHTML = 'No GeoJSON files found.';
+                return;
+            }
+
+            // Group files by directory
+            const filesByDir = {};
+            files.forEach(file => {
+                if (!filesByDir[file.directory]) {
+                    filesByDir[file.directory] = [];
+                }
+                filesByDir[file.directory].push(file);
+            });
+
+            // Create HTML
+            let html = '';
+            for (const [dir, dirFiles] of Object.entries(filesByDir)) {
+                html += `<h3>${dir}</h3><ul>`;
+                dirFiles.forEach(file => {
+                    html += `
+                        <li>
+                            <div class="file-item" data-path="${file.path}" data-name="${file.name}" data-dir="${file.directory}">
+                                ${file.name} (${formatFileSize(file.size)})
+                            </div>
+                        </li>
+                    `;
+                });
+                html += '</ul>';
+            }
+
+            fileList.innerHTML = html;
+
+            // Event delegation for file items
+            fileList.addEventListener('click', (e) => {
+                const target = e.target.closest('.file-item');
+                if (!target || !fileList.contains(target)) return;
+                handleFileClick({ currentTarget: target });
+            });
+        }
+
+        // Update process controls
+        function updateProcessControls() {
+            const fileSelect = document.getElementById('process-file');
+            const buildSourceSelect = document.getElementById('build-source-id');
+
+            // Check if elements exist before setting innerHTML
+            if (fileSelect) {
+                fileSelect.innerHTML = '<option value="">Choose a file...</option>';
+            }
+
+            if (buildSourceSelect) {
+                buildSourceSelect.innerHTML = '<option value="">Choose a file...</option>';
+            }
+
+            // Add file options (exclude heatmaps from processing/build controls)
+            availableFiles.forEach(file => {
+                if (file.directory === 'heatmaps') return; // skip generated heatmaps
+                const optionHtml = `<option value="${file.path}" data-dir="${file.directory}" data-name="${file.name}">${file.name} (${file.directory})</option>`;
+                if (fileSelect) {
+                    fileSelect.innerHTML += optionHtml;
+                }
+                if (buildSourceSelect) {
+                    buildSourceSelect.innerHTML += optionHtml;
+                }
+            });
+
+            // Add event listener for file selection
+            if (fileSelect) {
+                fileSelect.onchange = function() {
+                    updateProcessPropertyOptions(this.value, this.options[this.selectedIndex]);
+                };
+            }
+
+            // Add event listener for build source selection
+            if (buildSourceSelect) {
+                buildSourceSelect.onchange = function() {
+                    updateBuildPropertyOptions(this.value, this.options[this.selectedIndex]);
+                };
+            }
+
+            // Initialize decay parameters
+            updateDecayParams();
+
+            // Initialize mode options
+            updateBuildModeOptions();
+        }
+
+        // Update property options for processing
+        async function updateProcessPropertyOptions(filePath, selectedOption) {
+            const weightSelect = document.getElementById('process-weight-property');
+            const filterSelect = document.getElementById('process-filter-property');
+
+            // Check if elements exist before setting innerHTML
+            if (weightSelect) {
+                weightSelect.innerHTML = '<option value="">Choose a property...</option>';
+            }
+
+            if (filterSelect) {
+                filterSelect.innerHTML = '<option value="">Choose a property...</option>';
+            }
+
+            if (filePath && selectedOption && weightSelect && filterSelect) {
+                try {
+                    const directory = selectedOption.dataset.dir;
+                    const filename = selectedOption.dataset.name;
+
+                    // Fetch the GeoJSON file to analyze properties
+                    const response = await fetch(`/api/files/${directory}/${filename}`);
+                    const geojsonData = await response.json();
+
+                    const properties = new Set();
+                    const numericProperties = new Set();
+
+                    // Extract properties from features
+                    if (geojsonData.features && geojsonData.features.length > 0) {
+                        geojsonData.features.forEach(feature => {
+                            if (feature.properties) {
+                                Object.entries(feature.properties).forEach(([prop, value]) => {
+                                    properties.add(prop);
+                                    if (typeof value === 'number' && !isNaN(value)) {
+                                        numericProperties.add(prop);
+                                    }
+                                });
+                            }
+                        });
+                    }
+
+                    // Add numeric properties to weight select
+                    numericProperties.forEach(prop => {
+                        weightSelect.innerHTML += `<option value="${prop}">${prop}</option>`;
+                    });
+
+                    // Add all properties to filter select
+                    properties.forEach(prop => {
+                        filterSelect.innerHTML += `<option value="${prop}">${prop}</option>`;
+                    });
+
+                } catch (error) {
+                    console.error('Error analyzing GeoJSON properties:', error);
+                }
+            }
+        }
+
+        // Process GeoJSON function
+        async function processGeoJSON() {
+            // Deprecated for auto heatmap flow, still usable if UI is visible
+            logMessage('Process button clicked.');
+            const filePathElement = document.getElementById('process-file');
+            const gridSizeElement = document.getElementById('process-grid-size');
+            const weightPropertyElement = document.getElementById('process-weight-property');
+            const filterPropertyElement = document.getElementById('process-filter-property');
+            const filterValueElement = document.getElementById('process-filter-value');
+
+            // Check if required elements exist
+            if (!filePathElement || !gridSizeElement) {
+                console.error('Required process elements not found in DOM');
+                return;
+            }
+
+            const filePath = filePathElement.value;
+            const gridSize = parseInt(gridSizeElement.value);
+            const weightProperty = weightPropertyElement ? weightPropertyElement.value || null : null;
+            const filterProperty = filterPropertyElement ? filterPropertyElement.value : null;
+            const filterValue = filterValueElement ? filterValueElement.value : null;
+
+            if (!filePath) {
+                alert('Please select a file to process.');
+                return;
+            }
+
+            // Show loading indicator
+            const loadingIndicator = document.getElementById('process-loading');
+            const button = document.getElementById('process-geojson-btn');
+
+            if (loadingIndicator) {
+                loadingIndicator.style.display = 'block';
+            }
+
+            if (button) {
+                button.disabled = true;
+            }
+
+            try {
+                // Prepare filter property as JSON string if both property and value are provided
+                let filterPropertyJSON = null;
+                if (filterProperty && filterValue) {
+                    filterPropertyJSON = JSON.stringify({[filterProperty]: filterValue});
+                }
+
+                // Build query parameters
+                const params = new URLSearchParams({
+                    file_path: filePath,
+                    grid_size: gridSize.toString()
+                });
+
+                if (weightProperty) {
+                    params.append('weight_property', weightProperty);
+                }
+
+                if (filterPropertyJSON) {
+                    params.append('filter_property', filterPropertyJSON);
+                }
+
+                // Call the process API
+                const response = await fetch(`/api/process?${params.toString()}`);
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || 'Processing failed');
+                }
+
+                const processedData = await response.json();
+
+                // Generate layer name
+                if (filePathElement) {
+                    const selectedOption = filePathElement.options[filePathElement.selectedIndex];
+                    if (selectedOption) {
+                        const fileName = selectedOption.dataset.name;
+                        const layerName = `${fileName}_processed_heatmap`;
+
+                        // Add processed data to map
+                        addLayerToMap(layerName, processedData);
+
+                        // Log stats
+                        const values = processedData.features.map(f => f.properties.value || 0);
+                        const minV = Math.min(...values);
+                        const maxV = Math.max(...values);
+                        const avgV = values.reduce((a,b)=>a+b,0) / (values.length || 1);
+                        logMessage(`Processed ${fileName} -> grid=${gridSize}, weight=${weightProperty||'none'}, filter=${filterPropertyJSON||'none'} | cells=${values.length}, min=${minV.toFixed(3)}, max=${maxV.toFixed(3)}, avg=${avgV.toFixed(3)}`);
+                    }
+                }
+
+            } catch (error) {
+                console.error('Error processing GeoJSON:', error);
+                alert(`Error processing GeoJSON: ${error.message}`);
+                logMessage(`Error processing via UI: ${error.message}`);
+            } finally {
+                // Hide loading indicator
+                if (loadingIndicator) {
+                    loadingIndicator.style.display = 'none';
+                }
+
+                if (button) {
+                    button.disabled = false;
+                }
+            }
+        }
+
+        // Format file size
+        function formatFileSize(bytes) {
+            const mod = window.AppModules?.Utils;
+            if (mod && typeof mod.formatFileSize === 'function') {
+                return mod.formatFileSize(bytes);
+            }
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / 1048576).toFixed(1) + ' MB';
+        }
+
+        // Load and display a file, deciding endpoint and styling by folder
+        async function loadAndDisplayFile(file) {
+            try {
+                let url;
+                let isHeat = false;
+                if (file.directory === 'heatmaps') {
+                    url = `/api/heatmaps/${encodeURIComponent(file.name)}`;
+                    isHeat = true;
+                    logMessage(`Loading heatmap '${file.name}' from heatmaps folder`);
+                } else {
+                    url = `/api/files/${encodeURIComponent(file.directory)}/${encodeURIComponent(file.name)}`;
+                    logMessage(`Loading '${file.name}' from ${file.directory}`);
+                }
+                const res = await fetch(url);
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+                addLayerToMap(file.name, data, { isHeat });
+                const n = (data.features && data.features.length) || 0;
+                logMessage(`Rendered '${file.name}' with ${n} features`);
+            } catch (e) {
+                logMessage(`Error loading '${file.name}': ${e.message}`);
+            }
+        }
+
+        // Handle file click
+        async function handleFileClick(event) {
+            const fileItem = event.currentTarget;
+            const fileName = fileItem.dataset.name;
+            const dirName = fileItem.dataset.dir;
+            const filePath = fileItem.dataset.path;
+
+            await loadAndDisplayFile({ path: filePath, name: fileName, directory: dirName, dir: dirName });
+        }
+
+        // Add layer to map (conditional styling by source folder)
+        function addLayerToMap(name, geojsonData, opts = {}) {
+            const isHeat = !!opts.isHeat;
+            // Log what is being added
+            logMessage(`Rendering layer '${name}' with ${geojsonData.features ? geojsonData.features.length : 0} features`);
+            // Remove existing layer with same name if it exists
+            if (activeLayers[name]) {
+                map.removeLayer(activeLayers[name].layer);
+            }
+
+            const features = geojsonData.features || [];
+            const maxValue = isHeat ? Math.max(1, ...features.map(f => (f.properties && (f.properties.value || 0)) || 0)) : 1;
+            const normColor = isHeat ? null : colorFromName(name);
+
+            // Create layer with appropriate styling
+            const layer = L.geoJSON(geojsonData, {
+                style: function(feature) {
+                    if (isHeat) {
+                        const value = (feature.properties && (feature.properties.value || 0)) || 0;
+                        const normalizedValue = maxValue ? value / maxValue : 0;
+                        const gradientColor = getColorFromGradient(normalizedValue);
+                        return {
+                            color: '#000',  // Black border
+                            weight: 1,
+                            opacity: 1,
+                            fillOpacity: Math.max(0.3, normalizedValue * 0.7 + 0.3),
+                            fillColor: gradientColor
+                        };
+                    }
+                    return {
+                        color: normColor,
+                        weight: 2,
+                        opacity: 1,
+                        fillOpacity: 0.5
+                    };
+                },
+                pointToLayer: function(feature, latlng) {
+                    if (isHeat) {
+                        const value = (feature.properties && (feature.properties.value || 0)) || 0;
+                        const normalizedValue = maxValue ? value / maxValue : 0;
+                        const radius = Math.max(3, normalizedValue * 15);
+                        const gradientColor = getColorFromGradient(normalizedValue);
+                        return L.circleMarker(latlng, {
+                            radius: radius,
+                            fillColor: gradientColor,
+                            color: '#000',
+                            weight: 1,
+                            opacity: 1,
+                            fillOpacity: 0.8
+                        });
+                    }
+                    return L.circleMarker(latlng, {
+                        radius: 8,
+                        fillColor: normColor,
+                        color: '#000',
+                        weight: 1,
+                        opacity: 1,
+                        fillOpacity: 0.8
+                    });
+                },
+                onEachFeature: function(feature, layer) {
+                    if (feature.properties) {
+                        let popupContent = '<div class="popup-content">';
+                        for (const [key, value] of Object.entries(feature.properties)) {
+                            popupContent += `<strong>${key}:</strong> ${value}<br>`;
+                        }
+                        popupContent += '</div>';
+                        layer.bindPopup(popupContent);
+                    }
+                }
+            }).addTo(map);
+
+            // Store layer
+            activeLayers[name] = {
+                layer: layer
+            };
+
+            // Update layer list
+            updateLayerList();
+
+            // Fit map to layer bounds only once to avoid disrupting user view
+            if (!hasFittedOnce) {
+                try { map.fitBounds(layer.getBounds()); } catch (e) { /* ignore */ }
+                hasFittedOnce = true;
+            }
+        }
+
+        // Helper: generate heatmap for a file using backend /api/process, then load from heatmaps folder
+        async function generateHeatmapForFile(file, options = {}) {
+            const gridSize = options.gridSize || 50;
+            const weightProperty = options.weightProperty || '';
+            const filterObj = options.filter || null;
+            let filterPropertyJSON = filterObj ? JSON.stringify(filterObj) : null;
+
+            try {
+                logMessage(`Generating heatmap for ${file.name} (grid=${gridSize}, weight=${weightProperty || 'none'}${filterPropertyJSON ? ", filter=" + filterPropertyJSON : ''})`);
+                const params = new URLSearchParams({
+                    file_path: file.path,
+                    grid_size: String(gridSize)
+                });
+                if (weightProperty) params.append('weight_property', weightProperty);
+                if (filterPropertyJSON) params.append('filter_property', filterPropertyJSON);
+                const response = await fetch(`/api/process?${params.toString()}`);
+                if (!response.ok) {
+                    const err = await response.json().catch(() => ({}));
+                    throw new Error(err.detail || `HTTP ${response.status}`);
+                }
+                // Backend saved to heatmaps folder. Determine saved filename and fetch from /api/heatmaps
+                const dot = file.name.lastIndexOf('.');
+                const base = dot >= 0 ? file.name.slice(0, dot) : file.name;
+                const ext = dot >= 0 ? file.name.slice(dot) : '.geojson';
+                const savedName = `${base}_processed${ext}`;
+
+                const savedRes = await fetch(`/api/heatmaps/${encodeURIComponent(savedName)}`);
+                if (!savedRes.ok) throw new Error(`Fetch saved heatmap HTTP ${savedRes.status}`);
+                const processedData = await savedRes.json();
+                const layerName = savedName;
+                addLayerToMap(layerName, processedData, { isHeat: true });
+                // Stats
+                const values = processedData.features.map(f => f.properties.value || 0);
+                const minV = Math.min(...values);
+                const maxV = Math.max(...values);
+                const avgV = values.reduce((a,b)=>a+b,0) / (values.length || 1);
+                logMessage(`Completed ${file.name}: cells=${values.length}, min=${minV.toFixed(3)}, max=${maxV.toFixed(3)}, avg=${avgV.toFixed(3)}`);
+            } catch (e) {
+                logMessage(`Error generating heatmap for ${file.name}: ${e.message}`);
+            }
+        }
+
+        // Auto-generate a default heatmap on load
+        function autoGenerateDefaultHeatmap() {
+            if (!availableFiles || availableFiles.length === 0) return;
+            let file = availableFiles.find(f => /Major_Power_Stations/i.test(f.name)) || availableFiles[0];
+            logMessage(`Auto-selecting '${file.name}' for initial heatmap.`);
+            generateHeatmapForFile(file, { gridSize: 50 });
+        }
+
+        // Update layer list in sidebar
+        function updateLayerList() {
+            const ui = window.AppModules?.UI;
+            if (ui && typeof ui.renderLayersPanel === 'function') {
+                const container = document.getElementById('layer-list');
+                ui.renderLayersPanel(container, activeLayers, {
+                    onToggle: (name, checked) => {
+                        const lyr = activeLayers[name]?.layer;
+                        if (!lyr) return;
+                        if (checked) { map.addLayer(lyr); } else { map.removeLayer(lyr); }
+                    },
+                    onRemove: (name) => {
+                        const lyr = activeLayers[name]?.layer;
+                        if (lyr) { map.removeLayer(lyr); }
+                        delete activeLayers[name];
+                        updateLayerList();
+                    }
+                });
+                return;
+            }
+
+            const layerList = document.getElementById('layer-list');
+            let html = '';
+
+            for (const [name, layerInfo] of Object.entries(activeLayers)) {
+                const displayName = name.length > 30 ? name.substring(0, 30) + '...' : name;
+                html += `
+                    <li>
+                        <div class="layer-control">
+                            <input type="checkbox" id="layer-${name}" checked>
+                            <label for="layer-${name}" title="${name}">${displayName}</label>
+                            <button class="remove-layer" data-layer="${name}">×</button>
+                            <input type="checkbox" class="aggregate-select" id="aggregate-${name}" data-layer="${name}">
+                            <label for="aggregate-${name}" title="Select for aggregation" class="aggregate-label">Agg</label>
+                        </div>
+                    </li>
+                `;
+            }
+
+            layerList.innerHTML = html;
+
+            // Event delegation for visibility and removal
+            layerList.onclick = (e) => {
+                const removeBtn = e.target.closest('.remove-layer');
+                if (removeBtn && layerList.contains(removeBtn)) {
+                    removeLayer({ target: removeBtn });
+                    return;
+                }
+            };
+            layerList.onchange = (e) => {
+                const cb = e.target.closest('input[type=\"checkbox\"][id^=\"layer-\"]');
+                if (cb && layerList.contains(cb)) {
+                    toggleLayerVisibility({ target: cb });
+                }
+            };
+        }
+
+        // Toggle layer visibility
+        function toggleLayerVisibility(event) {
+            const layerName = event.target.id.replace('layer-', '');
+            const layer = activeLayers[layerName]?.layer;
+
+            if (layer) {
+                if (event.target.checked) {
+                    map.addLayer(layer);
+                } else {
+                    map.removeLayer(layer);
+                }
+            }
+        }
+
+        // Remove layer
+        function removeLayer(event) {
+            const layerName = event.target.dataset.layer;
+            const layer = activeLayers[layerName]?.layer;
+
+            if (layer) {
+                map.removeLayer(layer);
+                delete activeLayers[layerName];
+                updateLayerList();
+            }
+        }
+
+        // Deterministic color from layer name
+        function colorFromName(name) {
+            let h = 0;
+            for (let i = 0; i < name.length; i++) {
+                h = (h * 31 + name.charCodeAt(i)) | 0;
+            }
+            const hue = Math.abs(h) % 360;
+            return `hsl(${hue} 70% 50%)`;
+        }
+
+        // Generate color from gradient based on value (0-1)
+        function getColorFromGradient(value) {
+            // Clamp
+            const v = Math.max(0, Math.min(1, value || 0));
+            // Define gradient colors (from blue to red)
+            const colors = [
+                {value: 0, color: [0, 0, 255]},    // Blue for low values
+                {value: 0.5, color: [0, 255, 0]},  // Green for medium values
+                {value: 1, color: [255, 0, 0]}     // Red for high values
+            ];
+
+            // Find the two colors to interpolate between
+            let colorA, colorB, valueA, valueB;
+            for (let i = 0; i < colors.length - 1; i++) {
+                if (value >= colors[i].value && value <= colors[i+1].value) {
+                    colorA = colors[i].color;
+                    colorB = colors[i+1].color;
+                    valueA = colors[i].value;
+                    valueB = colors[i+1].value;
+                    break;
+                }
+            }
+
+            // If value is outside the range, use the extremes
+            if (!colorA) {
+                if (value <= colors[0].value) {
+                    return rgbToHex(colors[0].color);
+                } else {
+                    return rgbToHex(colors[colors.length-1].color);
+                }
+            }
+
+            // Interpolate between the two colors
+            const normalizedValue = (value - valueA) / (valueB - valueA);
+            const r = Math.round(colorA[0] + normalizedValue * (colorB[0] - colorA[0]));
+            const g = Math.round(colorA[1] + normalizedValue * (colorB[1] - colorA[1]));
+            const b = Math.round(colorA[2] + normalizedValue * (colorB[2] - colorA[2]));
+
+            return rgbToHex([r, g, b]);
+        }
+
+        // Convert RGB array to hex color
+        function rgbToHex(rgb) {
+            return '#' + rgb.map(x => {
+                const hex = x.toString(16);
+                return hex.length === 1 ? '0' + hex : hex;
+            }).join('');
+        }
+
+        // Aggregate selected layers
+        async function aggregateLayers() {
+            // Get selected layers
+            const selectedLayers = [];
+            document.querySelectorAll('.aggregate-select:checked').forEach(checkbox => {
+                const layerName = checkbox.dataset.layer;
+                if (layerName && activeLayers[layerName]) {
+                    selectedLayers.push(layerName);
+                }
+            });
+
+            if (selectedLayers.length < 2) {
+                alert('Please select at least two layers for aggregation.');
+                return;
+            }
+
+            // Get grid size
+            const gridSize = parseInt(document.getElementById('aggregate-grid-size').value);
+
+            // Show loading indicator
+            const loadingIndicator = document.getElementById('aggregate-loading');
+            const button = document.getElementById('aggregate-layers-btn');
+            loadingIndicator.style.display = 'block';
+            button.disabled = true;
+
+            try {
+                // Prepare layers data
+                const layers = [];
+                for (const layerName of selectedLayers) {
+                    // For now, we'll just use the layer name as the file path
+                    // In a real implementation, we'd need to store the file path with the layer
+                    const isProcessed = layerName.includes('_processed_heatmap');
+                    const originalName = isProcessed ? layerName.replace('_processed_heatmap', '') : layerName;
+
+                    // Find the file in availableFiles
+                    const file = availableFiles.find(f => f.name === originalName);
+                    if (file) {
+                        layers.push({
+                            file_path: file.path,
+                            dataset_weight: 1.0  // Default weight
+                        });
+                    }
+                }
+
+                if (layers.length < 2) {
+                    throw new Error('Could not find file paths for selected layers.');
+                }
+
+                // Call the aggregate API
+                const response = await fetch('/api/aggregate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        layers: layers,
+                        grid_size: gridSize
+                    })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || 'Aggregation failed');
+                }
+
+                const processedData = await response.json();
+
+                // Generate layer name
+                const layerName = `aggregated_heatmap_${Date.now()}`;
+
+                // Add processed data to map
+                addLayerToMap(layerName, processedData);
+
+                console.log(`Successfully aggregated ${layers.length} layers into heatmap with ${processedData.features.length} points`);
+
+            } catch (error) {
+                console.error('Error aggregating layers:', error);
+                alert(`Error aggregating layers: ${error.message}`);
+            } finally {
+                // Hide loading indicator
+                loadingIndicator.style.display = 'none';
+                button.disabled = false;
+            }
+        }
+
+        // Initialize decay parameters based on selected decay function
+        function updateDecayParams() {
+            const decayElement = document.getElementById('build-decay');
+            const container = document.getElementById('decay-params-container');
+
+            // Check if elements exist
+            if (!decayElement || !container) {
+                console.error('Decay elements not found in DOM');
+                return;
+            }
+
+            const decayType = decayElement.value;
+
+            // Clear existing parameters
+            container.innerHTML = '';
+
+            // Add parameters based on decay type
+            if (decayType === 'exp') {
+                container.innerHTML = `
+                    <label for="decay-scale">Scale:</label>
+                    <input type="number" id="decay-scale" value="1000.0" min="10" max="10000" step="10">
+                `;
+            } else if (decayType === 'inv') {
+                container.innerHTML = `
+                    <label for="decay-eps">Epsilon:</label>
+                    <input type="number" id="decay-eps" value="1.0" min="0.1" max="10" step="0.1">
+
+                    <label for="decay-power">Power:</label>
+                    <input type="number" id="decay-power" value="1.0" min="0.1" max="5" step="0.1">
+                `;
+            } else if (decayType === 'linear') {
+                container.innerHTML = `
+                    <label for="decay-radius">Radius:</label>
+                    <input type="number" id="decay-radius" value="1000.0" min="10" max="10000" step="10">
+                `;
+            }
+        }
+
+        // Function to update mode options based on geometry type
+        function updateBuildModeOptions() {
+            const geometryTypeElement = document.getElementById('build-geometry-type');
+            const modeSelect = document.getElementById('build-mode');
+
+            // Check if elements exist
+            if (!geometryTypeElement || !modeSelect) {
+                console.error('Build mode elements not found in DOM');
+                return;
+            }
+
+            const geometryType = geometryTypeElement.value;
+
+            // Clear existing options
+            modeSelect.innerHTML = '';
+
+            // Add options based on geometry type
+            if (geometryType === 'point') {
+                modeSelect.innerHTML = `
+                    <option value="nearest">Nearest (Count)</option>
+                    <option value="sum_k">Sum K (Density)</option>
+                `;
+            } else if (geometryType === 'line') {
+                modeSelect.innerHTML = `
+                    <option value="nearest">Nearest</option>
+                `;
+            } else if (geometryType === 'polygon') {
+                modeSelect.innerHTML = `
+                    <option value="mask">Mask</option>
+                    <option value="centroid">Centroid</option>
+                    <option value="boundary">Boundary</option>
+                `;
+            }
+        }
+
+        // Add event listener for geometry type change
+        const geometryTypeElement = document.getElementById('build-geometry-type');
+        if (geometryTypeElement) {
+            geometryTypeElement.addEventListener('change', updateBuildModeOptions);
+        }
+
+        // Add event listener for decay function change
+        const decayElement = document.getElementById('build-decay');
+        if (decayElement) {
+            decayElement.addEventListener('change', updateDecayParams);
+        }
+
+        // Function to add a new layer configuration to the multi-layer form
+        function addLayerConfig() {
+            const layerList = document.getElementById('multi-layer-list');
+            const layerCount = layerList.children.length;
+            const layerId = Date.now(); // Use timestamp as unique ID
+
+            const layerHtml = `
+                <div class="layer-config" id="layer-config-${layerId}" style="border: 1px solid #b3c6e6; padding: 10px; margin-bottom: 15px; border-radius: 5px;">
+                    <h3>Layer ${layerCount + 1} <button type="button" onclick="removeLayerConfig(${layerId})" style="float: right; background-color: #e74c3c; color: white; border: none; border-radius: 3px; cursor: pointer;">Remove</button></h3>
+
+                    <label for="multi-source-id-${layerId}">Source ID (File):</label>
+                    <select id="multi-source-id-${layerId}" class="multi-source-id">
+                        <option value="">Choose a file...</option>
+                        ${getFileOptions()}
+                    </select>
+
+                    <label for="multi-geometry-type-${layerId}">Geometry Type:</label>
+                    <select id="multi-geometry-type-${layerId}" class="multi-geometry-type">
+                        <option value="point">Point</option>
+                        <option value="line">Line</option>
+                        <option value="polygon">Polygon</option>
+                    </select>
+
+                    <label for="multi-mode-${layerId}">Mode:</label>
+                    <select id="multi-mode-${layerId}" class="multi-mode">
+                        <option value="density">Density</option>
+                        <option value="count">Count</option>
+                        <option value="weighted">Weighted</option>
+                    </select>
+
+                    <label for="multi-weight-property-${layerId}">Weight Property:</label>
+                    <select id="multi-weight-property-${layerId}" class="multi-weight-property">
+                        <option value="">Choose a property...</option>
+                    </select>
+
+                    <label for="multi-filter-property-${layerId}">Filter Property:</label>
+                    <select id="multi-filter-property-${layerId}" class="multi-filter-property">
+                        <option value="">Choose a property...</option>
+                    </select>
+
+                    <label for="multi-filter-value-${layerId}">Filter Value:</label>
+                    <input type="text" id="multi-filter-value-${layerId}" class="multi-filter-value" placeholder="Enter filter value...">
+
+                    <label for="multi-dataset-weight-${layerId}">Dataset Weight:</label>
+                    <input type="number" id="multi-dataset-weight-${layerId}" class="multi-dataset-weight" value="1.0" min="0.1" max="10" step="0.1">
+
+                    <label for="multi-decay-${layerId}">Decay Function:</label>
+                    <select id="multi-decay-${layerId}" class="multi-decay" onchange="updateMultiDecayParams(${layerId})">
+                        <option value="exp">Exponential</option>
+                        <option value="inv">Inverse</option>
+                        <option value="linear">Linear Cutoff</option>
+                    </select>
+
+                    <div id="multi-decay-params-${layerId}" class="multi-decay-params">
+                        <label for="multi-decay-scale-${layerId}">Scale:</label>
+                        <input type="number" id="multi-decay-scale-${layerId}" value="1000.0" min="10" max="10000" step="10">
+                    </div>
+
+                    <label for="multi-k-${layerId}">K Value (Neighbors):</label>
+                    <input type="number" id="multi-k-${layerId}" class="multi-k" value="8" min="1" max="20">
+
+                    <label for="multi-mask-value-${layerId}">Mask Value:</label>
+                    <input type="number" id="multi-mask-value-${layerId}" class="multi-mask-value" value="1.0" min="0" max="10" step="0.1">
+                </div>
+            `;
+
+            layerList.insertAdjacentHTML('beforeend', layerHtml);
+
+            // Add event listener for source selection
+            document.getElementById(`multi-source-id-${layerId}`).addEventListener('change', function() {
+                updateMultiLayerPropertyOptions(this.value, layerId);
+            });
+
+            // Add event listener for geometry type change
+            document.getElementById(`multi-geometry-type-${layerId}`).addEventListener('change', function() {
+                updateMultiModeOptions(layerId);
+            });
+
+            // Initialize decay params
+            updateMultiDecayParams(layerId);
+
+            // Initialize mode options
+            updateMultiModeOptions(layerId);
+        }
+
+        // Function to remove a layer configuration
+        function removeLayerConfig(layerId) {
+            const layerElement = document.getElementById(`layer-config-${layerId}`);
+            if (layerElement) {
+                layerElement.remove();
+            }
+        }
+
+        // Function to update mode options for a multi-layer config
+        function updateMultiModeOptions(layerId) {
+            const geometryTypeElement = document.getElementById(`multi-geometry-type-${layerId}`);
+            const modeSelect = document.getElementById(`multi-mode-${layerId}`);
+
+            // Check if elements exist
+            if (!geometryTypeElement || !modeSelect) {
+                console.error(`Multi-mode elements not found for layer ${layerId}`);
+                return;
+            }
+
+            const geometryType = geometryTypeElement.value;
+
+            // Clear existing options
+            modeSelect.innerHTML = '';
+
+            // Add options based on geometry type
+            if (geometryType === 'point') {
+                modeSelect.innerHTML = `
+                    <option value="nearest">Nearest (Count)</option>
+                    <option value="sum_k">Sum K (Density)</option>
+                `;
+            } else if (geometryType === 'line') {
+                modeSelect.innerHTML = `
+                    <option value="nearest">Nearest</option>
+                `;
+            } else if (geometryType === 'polygon') {
+                modeSelect.innerHTML = `
+                    <option value="mask">Mask</option>
+                    <option value="centroid">Centroid</option>
+                    <option value="boundary">Boundary</option>
+                `;
+            }
+        }
+
+        // Function to update decay parameters for a multi-layer config
+        function updateMultiDecayParams(layerId) {
+            const decayElement = document.getElementById(`multi-decay-${layerId}`);
+            const container = document.getElementById(`multi-decay-params-${layerId}`);
+
+            // Check if elements exist
+            if (!decayElement || !container) {
+                console.error(`Multi-decay elements not found for layer ${layerId}`);
+                return;
+            }
+
+            const decayType = decayElement.value;
+
+            // Clear existing parameters
+            container.innerHTML = '';
+
+            // Add parameters based on decay type
+            if (decayType === 'exp') {
+                container.innerHTML = `
+                    <label for="multi-decay-scale-${layerId}">Scale:</label>
+                    <input type="number" id="multi-decay-scale-${layerId}" value="1000.0" min="10" max="10000" step="10">
+                `;
+            } else if (decayType === 'inv') {
+                container.innerHTML = `
+                    <label for="multi-decay-eps-${layerId}">Epsilon:</label>
+                    <input type="number" id="multi-decay-eps-${layerId}" value="1.0" min="0.1" max="10" step="0.1">
+
+                    <label for="multi-decay-power-${layerId}">Power:</label>
+                    <input type="number" id="multi-decay-power-${layerId}" value="1.0" min="0.1" max="5" step="0.1">
+                `;
+            } else if (decayType === 'linear') {
+                container.innerHTML = `
+                    <label for="multi-decay-radius-${layerId}">Radius:</label>
+                    <input type="number" id="multi-decay-radius-${layerId}" value="1000.0" min="10" max="10000" step="10">
+                `;
+            }
+        }
+
+        // Helper function to get file options HTML
+        function getFileOptions() {
+            let options = '';
+            availableFiles.forEach(file => {
+                options += `<option value="${file.path}" data-dir="${file.directory}" data-name="${file.name}">${file.name} (${file.directory})</option>`;
+            });
+            return options;
+        }
+
+        // Update property options for build layer
+        async function updateBuildPropertyOptions(filePath, selectedOption) {
+            const weightSelect = document.getElementById('build-weight-property'); // legacy (may not exist)
+            const filterSelect = document.getElementById('build-filter-property'); // legacy (may not exist)
+            const weightByPropSelect = document.getElementById('build-weight-by-property');
+            const filterProp2Select = document.getElementById('build-filter-property2');
+            const filterValuesSelect = document.getElementById('build-filter-values');
+            const weightRanksContainer = document.getElementById('weight-ranks-container');
+            const weightRanksList = document.getElementById('weight-ranks-list');
+
+            // Reset
+            if (weightSelect) weightSelect.innerHTML = '<option value="">Choose a property...</option>';
+            if (filterSelect) filterSelect.innerHTML = '<option value="">Choose a property...</option>';
+            if (weightByPropSelect) weightByPropSelect.innerHTML = '<option value="">Choose a property...</option>';
+            if (filterProp2Select) filterProp2Select.innerHTML = '<option value="">Choose a property...</option>';
+            if (filterValuesSelect) filterValuesSelect.innerHTML = '';
+            if (weightRanksList) weightRanksList.innerHTML = '';
+            if (weightRanksContainer) weightRanksContainer.style.display = 'none';
+
+            if (filePath && selectedOption) {
+                try {
+                    // Prefer backend endpoints to compute distinct property names
+                    const propsResp = await fetch(`/api/properties?file_path=${encodeURIComponent(filePath)}`);
+                    const propsData = await propsResp.json();
+                    const props = propsData.properties || [];
+
+                    // Also determine numeric properties by peeking first feature via existing file fetch
+                    const directory = selectedOption?.dataset?.dir;
+                    const filename = selectedOption?.dataset?.name;
+                    if (directory && filename) {
+                        const response = await fetch(`/api/files/${directory}/${filename}`);
+                        const geojsonData = await response.json();
+                        const numericProperties = new Set();
+                        if (geojsonData.features && geojsonData.features.length > 0) {
+                            geojsonData.features.forEach(feature => {
+                                if (feature.properties) {
+                                    Object.entries(feature.properties).forEach(([prop, value]) => {
+                                        if (typeof value === 'number' && !isNaN(value)) {
+                                            numericProperties.add(prop);
+                                        }
+                                    });
+                                }
+                            });
+                        }
+                        // Add numeric properties to legacy weight select (if present)
+                        if (weightSelect) {
+                            numericProperties.forEach(prop => {
+                                weightSelect.innerHTML += `<option value="${prop}">${prop}</option>`;
+                            });
+                        }
+                    }
+
+                    // Add all properties to both filter and new selectors
+                    props.forEach(prop => {
+                        if (filterSelect) {
+                            filterSelect.innerHTML += `<option value="${prop}">${prop}</option>`;
+                        }
+                        if (weightByPropSelect) {
+                            weightByPropSelect.innerHTML += `<option value="${prop}">${prop}</option>`;
+                        }
+                        if (filterProp2Select) {
+                            filterProp2Select.innerHTML += `<option value="${prop}">${prop}</option>`;
+                        }
+                    });
+                } catch (error) {
+                    console.error('Error analyzing GeoJSON properties:', error);
+                }
+            }
+        }
+
+        // When weight-by-property changes, fetch values and render rank inputs
+        document.getElementById('build-weight-by-property')?.addEventListener('change', async (e) => {
+            const prop = e.target.value;
+            const weightRanksContainer = document.getElementById('weight-ranks-container');
+            const weightRanksList = document.getElementById('weight-ranks-list');
+            if (weightRanksList) weightRanksList.innerHTML = '';
+            if (!prop) { if (weightRanksContainer) weightRanksContainer.style.display = 'none'; return; }
+            const src = document.getElementById('build-source-id');
+            const opt = src?.selectedOptions?.[0];
+            if (!opt) return;
+            const filePath = opt.value;
+            const resp = await fetch(`/api/property-values?file_path=${encodeURIComponent(filePath)}&property=${encodeURIComponent(prop)}`);
+            const data = await resp.json();
+            const values = data.values || [];
+            if (weightRanksContainer) weightRanksContainer.style.display = 'block';
+            values.forEach(v => {
+                const id = `rank-${prop}-${String(v).replace(/[^a-zA-Z0-9_-]/g,'_')}`;
+                const row = document.createElement('div');
+                row.style.display = 'flex';
+                row.style.alignItems = 'center';
+                row.style.gap = '8px';
+                row.innerHTML = `
+                  <label style="flex:1;">${v}</label>
+                  <input type="number" id="${id}" data-val="${v}" min="1" step="1" value="1" style="width:90px;" />
+                `;
+                weightRanksList.appendChild(row);
+            });
+        });
+
+        // Filter property multi-select values
+        document.getElementById('build-filter-property2')?.addEventListener('change', async (e) => {
+            const prop = e.target.value;
+            const filterValuesSelect = document.getElementById('build-filter-values');
+            if (filterValuesSelect) filterValuesSelect.innerHTML = '';
+            if (!prop) return;
+            const src = document.getElementById('build-source-id');
+            const opt = src?.selectedOptions?.[0];
+            if (!opt) return;
+            const filePath = opt.value;
+            const resp = await fetch(`/api/property-values?file_path=${encodeURIComponent(filePath)}&property=${encodeURIComponent(prop)}`);
+            const data = await resp.json();
+            const values = data.values || [];
+            values.forEach(v => {
+                const optEl = document.createElement('option');
+                optEl.value = v;
+                optEl.textContent = v;
+                filterValuesSelect.appendChild(optEl);
+            });
+        });
+
+        // Update property options for multi-layer
+        async function updateMultiLayerPropertyOptions(filePath, layerId) {
+            const weightSelect = document.getElementById(`multi-weight-property-${layerId}`);
+            const filterSelect = document.getElementById(`multi-filter-property-${layerId}`);
+
+            // Check if elements exist before setting innerHTML
+            if (weightSelect) {
+                weightSelect.innerHTML = '<option value="">Choose a property...</option>';
+            }
+
+            if (filterSelect) {
+                filterSelect.innerHTML = '<option value="">Choose a property...</option>';
+            }
+
+            if (filePath && weightSelect && filterSelect) {
+                try {
+                    const sourceElement = document.getElementById(`multi-source-id-${layerId}`);
+                    if (!sourceElement || !sourceElement.selectedOptions || !sourceElement.selectedOptions[0]) {
+                        console.error('Source element or selected option not found');
+                        return;
+                    }
+
+                    const selectedOption = sourceElement.selectedOptions[0];
+                    const directory = selectedOption.dataset.dir;
+                    const filename = selectedOption.dataset.name;
+
+                    // Fetch the GeoJSON file to analyze properties
+                    const response = await fetch(`/api/files/${directory}/${filename}`);
+                    const geojsonData = await response.json();
+
+                    const properties = new Set();
+                    const numericProperties = new Set();
+
+                    // Extract properties from features
+                    if (geojsonData.features && geojsonData.features.length > 0) {
+                        geojsonData.features.forEach(feature => {
+                            if (feature.properties) {
+                                Object.entries(feature.properties).forEach(([prop, value]) => {
+                                    properties.add(prop);
+                                    if (typeof value === 'number' && !isNaN(value)) {
+                                        numericProperties.add(prop);
+                                    }
+                                });
+                            }
+                        });
+                    }
+
+                    // Add numeric properties to weight select
+                    numericProperties.forEach(prop => {
+                        weightSelect.innerHTML += `<option value="${prop}">${prop}</option>`;
+                    });
+
+                    // Add all properties to filter select
+                    properties.forEach(prop => {
+                        filterSelect.innerHTML += `<option value="${prop}">${prop}</option>`;
+                    });
+
+                } catch (error) {
+                    console.error('Error analyzing GeoJSON properties:', error);
+                }
+            }
+        }
+
+        // Build Layer function
+        async function buildLayer() {
+            // Get all required elements
+            const sourceIdElement = document.getElementById('build-source-id');
+            const geometryTypeElement = document.getElementById('build-geometry-type');
+            const modeElement = document.getElementById('build-mode');
+            const weightPropertyElement = document.getElementById('build-weight-property');
+            const filterPropertyElement = document.getElementById('build-filter-property');
+            const filterValueElement = document.getElementById('build-filter-value');
+            const datasetWeightElement = document.getElementById('build-dataset-weight');
+            const decayElement = document.getElementById('build-decay');
+            const kElement = document.getElementById('build-k');
+            const maskValueElement = document.getElementById('build-mask-value');
+            const gridSizeElement = document.getElementById('build-grid-size');
+            const outputFilenameElement = document.getElementById('build-output-filename');
+
+            // Check if required elements exist
+            if (!sourceIdElement || !geometryTypeElement || !modeElement || !gridSizeElement || !outputFilenameElement) {
+                console.error('Required build elements not found in DOM');
+                return;
+            }
+
+            // Get values from elements
+            const sourceId = sourceIdElement.value;
+            const geometryType = geometryTypeElement.value;
+            const mode = modeElement.value;
+            const weightProperty = weightPropertyElement ? weightPropertyElement.value || null : null;
+            const filterProperty = filterPropertyElement ? filterPropertyElement.value : null;
+            const filterValue = filterValueElement ? filterValueElement.value : null;
+            const datasetWeight = datasetWeightElement ? parseFloat(datasetWeightElement.value) : 1.0;
+            const decay = decayElement ? decayElement.value : 'exp';
+            const k = kElement ? parseInt(kElement.value) : 8;
+            const maskValue = maskValueElement ? parseFloat(maskValueElement.value) : 1.0;
+            const gridSize = parseInt(gridSizeElement.value);
+            const outputFilename = outputFilenameElement.value;
+
+            if (!sourceId) {
+                alert('Please select a source file.');
+                return;
+            }
+
+            // Get decay parameters based on decay type
+            let decayParams = {};
+            if (decay === 'exp') {
+                const scaleElement = document.getElementById('decay-scale');
+                if (scaleElement) {
+                    decayParams.scale = parseFloat(scaleElement.value);
+                }
+            } else if (decay === 'inv') {
+                const epsElement = document.getElementById('decay-eps');
+                const powerElement = document.getElementById('decay-power');
+                if (epsElement) {
+                    decayParams.eps = parseFloat(epsElement.value);
+                }
+                if (powerElement) {
+                    decayParams.power = parseFloat(powerElement.value);
+                }
+            } else if (decay === 'linear') {
+                const radiusElement = document.getElementById('decay-radius');
+                if (radiusElement) {
+                    decayParams.radius = parseFloat(radiusElement.value);
+                }
+            }
+
+            // Prepare filter property as JSON object
+            let filterPropertyObj = null;
+            // New multi-select filter takes precedence if chosen
+            const filterProp2Select = document.getElementById('build-filter-property2');
+            const filterValuesSelect = document.getElementById('build-filter-values');
+            const filterProp2 = filterProp2Select ? filterProp2Select.value : '';
+            if (filterProp2) {
+                const selVals = [...(filterValuesSelect?.selectedOptions || [])].map(o => o.value);
+                if (selVals.length > 0) {
+                    filterPropertyObj = { [filterProp2]: selVals };
+                }
+            } else if (filterProperty && filterValue) {
+                // Legacy single-value filter
+                filterPropertyObj = { [filterProperty]: filterValue };
+            }
+
+            // Show loading indicator
+            const loadingIndicator = document.getElementById('build-loading');
+            const button = document.getElementById('build-layer-btn');
+
+            if (loadingIndicator) {
+                loadingIndicator.style.display = 'block';
+            }
+
+            if (button) {
+                button.disabled = true;
+            }
+
+            try {
+                // Collect per-value rank divisors
+                const weightByPropSelect = document.getElementById('build-weight-by-property');
+                const weightRanksList = document.getElementById('weight-ranks-list');
+                let weightByProperty = weightByPropSelect ? weightByPropSelect.value : '';
+                if (weightByProperty === '') weightByProperty = null;
+                let weightRanks = null;
+                if (weightByProperty && weightRanksList) {
+                    weightRanks = {};
+                    [...(weightRanksList.querySelectorAll('input[type="number"]') || [])].forEach(inp => {
+                        const v = inp.getAttribute('data-val');
+                        const r = parseFloat(inp.value);
+                        if (!isNaN(r) && r > 0) {
+                            weightRanks[String(v)] = r;
+                        }
+                    });
+                }
+
+                // Prepare request body
+                const requestBody = {
+                    layer: {
+                        source_id: sourceId,
+                        geometry_type: geometryType,
+                        mode: mode,
+                        filter_property: filterPropertyObj,
+                        weight_property: weightProperty,
+                        dataset_weight: datasetWeight,
+                        decay: decay,
+                        decay_params: decayParams,
+                        k: k,
+                        mask_value: maskValue,
+                        output_filename: outputFilename,
+                        // NEW
+                        weight_by_property: weightByProperty,
+                        weight_ranks: weightRanks
+                    },
+                    grid_size: gridSize
+                };
+
+                // Call the build_layer API
+                const response = await fetch('/api/build_layer', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(requestBody)
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || 'Layer building failed');
+                }
+
+                const responseData = await response.json();
+
+                // Refresh file list to show the new file
+                await fetchFiles();
+
+                // Find the new file in the updated file list
+                const newFile = availableFiles.find(file => file.name === outputFilename);
+
+                if (newFile) {
+                    // Load the new file using the correct endpoint
+                    let fileResponse;
+                    if (newFile.directory === 'heatmaps') {
+                        fileResponse = await fetch(`/api/heatmaps/${encodeURIComponent(newFile.name)}`);
+                    } else {
+                        fileResponse = await fetch(`/api/files/${encodeURIComponent(newFile.directory)}/${encodeURIComponent(newFile.name)}`);
+                    }
+                    const geojsonData = await fileResponse.json();
+
+                    // Add to map (use isHeat for heatmaps)
+                    addLayerToMap(newFile.name, geojsonData, { isHeat: newFile.directory === 'heatmaps' });
+
+                    console.log(`Successfully built layer: ${outputFilename}`);
+                } else {
+                    console.log(`Layer built successfully, but not automatically loaded. Please find it in the file list.`);
+                }
+
+            } catch (error) {
+                console.error('Error building layer:', error);
+                alert(`Error building layer: ${error.message}`);
+            } finally {
+                // Hide loading indicator
+                if (loadingIndicator) {
+                    loadingIndicator.style.display = 'none';
+                }
+
+                if (button) {
+                    button.disabled = false;
+                }
+            }
+        }
+
+        // Build Multi-Layer function
+        async function buildMultiLayer() {
+            const layerConfigs = document.querySelectorAll('.layer-config');
+            if (layerConfigs.length === 0) {
+                alert('Please add at least one layer configuration.');
+                return;
+            }
+
+            const gridSizeElement = document.getElementById('multi-grid-size');
+            const outputFilenameElement = document.getElementById('multi-output-filename');
+
+            // Check if required elements exist
+            if (!gridSizeElement || !outputFilenameElement) {
+                console.error('Required multi-layer elements not found in DOM');
+                return;
+            }
+
+            const gridSize = parseInt(gridSizeElement.value);
+            const outputFilename = outputFilenameElement.value;
+
+            // Show loading indicator
+            const loadingIndicator = document.getElementById('multi-build-loading');
+            const button = document.getElementById('build-multi-layer-btn');
+
+            if (loadingIndicator) {
+                loadingIndicator.style.display = 'block';
+            }
+
+            if (button) {
+                button.disabled = true;
+            }
+
+            try {
+                // Prepare layers array
+                const layers = [];
+
+                for (const config of layerConfigs) {
+                    if (!config.id) {
+                        console.error('Layer config ID not found');
+                        continue;
+                    }
+
+                    const layerId = config.id.replace('layer-config-', '');
+                    const sourceIdElement = document.getElementById(`multi-source-id-${layerId}`);
+
+                    if (!sourceIdElement) {
+                        console.error(`Source ID element not found for layer ${layerId}`);
+                        continue;
+                    }
+
+                    const sourceId = sourceIdElement.value;
+
+                    if (!sourceId) {
+                        console.error(`Source ID is required for layer ${layerId}`);
+                        continue;
+                    }
+
+                    // Get all elements with null checks
+                    const geometryTypeElement = document.getElementById(`multi-geometry-type-${layerId}`);
+                    const modeElement = document.getElementById(`multi-mode-${layerId}`);
+                    const weightPropertyElement = document.getElementById(`multi-weight-property-${layerId}`);
+                    const filterPropertyElement = document.getElementById(`multi-filter-property-${layerId}`);
+                    const filterValueElement = document.getElementById(`multi-filter-value-${layerId}`);
+                    const datasetWeightElement = document.getElementById(`multi-dataset-weight-${layerId}`);
+                    const decayElement = document.getElementById(`multi-decay-${layerId}`);
+                    const kElement = document.getElementById(`multi-k-${layerId}`);
+                    const maskValueElement = document.getElementById(`multi-mask-value-${layerId}`);
+
+                    // Get values with null checks
+                    const geometryType = geometryTypeElement ? geometryTypeElement.value : 'point';
+                    const mode = modeElement ? modeElement.value : 'density';
+                    const weightProperty = weightPropertyElement ? weightPropertyElement.value || null : null;
+                    const filterProperty = filterPropertyElement ? filterPropertyElement.value : null;
+                    const filterValue = filterValueElement ? filterValueElement.value : null;
+                    const datasetWeight = datasetWeightElement ? parseFloat(datasetWeightElement.value) : 1.0;
+                    const decay = decayElement ? decayElement.value : 'exp';
+                    const k = kElement ? parseInt(kElement.value) : 8;
+                    const maskValue = maskValueElement ? parseFloat(maskValueElement.value) : 1.0;
+
+                    // Get decay parameters based on decay type
+                    let decayParams = {};
+                    if (decay === 'exp') {
+                        const scaleElement = document.getElementById(`multi-decay-scale-${layerId}`);
+                        if (scaleElement) {
+                            decayParams.scale = parseFloat(scaleElement.value);
+                        }
+                    } else if (decay === 'inv') {
+                        const epsElement = document.getElementById(`multi-decay-eps-${layerId}`);
+                        const powerElement = document.getElementById(`multi-decay-power-${layerId}`);
+                        if (epsElement) {
+                            decayParams.eps = parseFloat(epsElement.value);
+                        }
+                        if (powerElement) {
+                            decayParams.power = parseFloat(powerElement.value);
+                        }
+                    } else if (decay === 'linear') {
+                        const radiusElement = document.getElementById(`multi-decay-radius-${layerId}`);
+                        if (radiusElement) {
+                            decayParams.radius = parseFloat(radiusElement.value);
+                        }
+                    }
+
+                    // Prepare filter property as JSON object if both property and value are provided
+                    let filterPropertyObj = null;
+                    if (filterProperty && filterValue) {
+                        filterPropertyObj = {[filterProperty]: filterValue};
+                    }
+
+                    layers.push({
+                        source_id: sourceId,
+                        geometry_type: geometryType,
+                        mode: mode,
+                        filter_property: filterPropertyObj,
+                        weight_property: weightProperty,
+                        dataset_weight: datasetWeight,
+                        decay: decay,
+                        decay_params: decayParams,
+                        k: k,
+                        mask_value: maskValue,
+                        output_filename: `temp_layer_${layerId}.geojson` // Temporary filename for individual layers
+                    });
+                }
+
+                if (layers.length === 0) {
+                    throw new Error('No valid layers found to process');
+                }
+
+                // Prepare request body
+                const requestBody = {
+                    layers: layers,
+                    grid_size: gridSize,
+                    output_filename: outputFilename
+                };
+
+                // Call the build_multi_layer API
+                const response = await fetch('/api/build_multi_layer', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(requestBody)
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || 'Multi-layer building failed');
+                }
+
+                const responseData = await response.json();
+
+                // Refresh file list to show the new file
+                await fetchFiles();
+
+                // Find the new file in the updated file list
+                const newFile = availableFiles.find(file => file.name === outputFilename);
+
+                if (newFile) {
+                    // Load the new file using the correct endpoint
+                    let fileResponse;
+                    if (newFile.directory === 'heatmaps') {
+                        fileResponse = await fetch(`/api/heatmaps/${encodeURIComponent(newFile.name)}`);
+                    } else {
+                        fileResponse = await fetch(`/api/files/${encodeURIComponent(newFile.directory)}/${encodeURIComponent(newFile.name)}`);
+                    }
+                    const geojsonData = await fileResponse.json();
+
+                    // Add to map (use isHeat for heatmaps)
+                    addLayerToMap(newFile.name, geojsonData, { isHeat: newFile.directory === 'heatmaps' });
+
+                    console.log(`Successfully built multi-layer: ${outputFilename}`);
+                } else {
+                    console.log(`Multi-layer built successfully, but not automatically loaded. Please find it in the file list.`);
+                }
+
+            } catch (error) {
+                console.error('Error building multi-layer:', error);
+                alert(`Error building multi-layer: ${error.message}`);
+            } finally {
+                // Hide loading indicator
+                if (loadingIndicator) {
+                    loadingIndicator.style.display = 'none';
+                }
+
+                if (button) {
+                    button.disabled = false;
+                }
+            }
+        }
+
+        // Initialize
+        fetchFiles();
+    </script>
+</body>
+</html>

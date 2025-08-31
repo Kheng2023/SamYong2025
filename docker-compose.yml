@@ -1,19 +1,29 @@
-version: '3'
-
 services:
   # Tile server for serving map tiles
-  tileserver:
-    image: maptiler/tileserver-gl
-    container_name: map-tileserver
+#  tileserver:
+#    image: maptiler/tileserver-gl
+#    container_name: map-tileserver
+#    ports:
+#      - "8080:8080"
+#    volumes:
+#      - ./map_data:/data
+#      - ./tileserver_config/config.json:/config/config.json
+#      - ./tileserver_config/styles:/config/styles
+#    environment:
+#      - CORS_ORIGINS=*
+#    command: ["--config", "/config/config.json", "--verbose"]
+#    restart: unless-stopped
+
+  # Map Baker service
+  map_baker:
+    build:
+      context: .
+      dockerfile: Dockerfile.map_baker
+    container_name: map-baker
     ports:
-      - "8080:8080"
+      - "8000:8000"
     volumes:
-      - ./map_data:/data
-      - ./tileserver_config/config.json:/config/config.json
-      - ./tileserver_config/styles:/config/styles
-    environment:
-      - CORS_ORIGINS=*
-    command: ["--config", "/config/config.json", "--verbose"]
+      - ./geojsons:/app/geojsons
     restart: unless-stopped
 
   # Streamlit frontend application
@@ -25,7 +35,9 @@ services:
     ports:
       - "8501:8501"
     volumes:
-      - .:/app
-    depends_on:
-      - tileserver
+      - ./:/app
+      - ./map_data:/app/map_data
+      - ./output:/app/output
+#    depends_on:
+#      - tileserver
     restart: unless-stopped
