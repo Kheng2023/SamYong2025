@@ -12,202 +12,8 @@ st.set_page_config(page_title="AI Data Centre Heatmap MVP", layout="wide")
 
 st.title("🇦🇺 Data Centres: Heatmap MVP")
 
-mode = st.sidebar.selectbox("View", ["Dummy heatmap", "Power Stations", "GeoJSON Heatmaps"])
+mode = st.sidebar.selectbox("View", ["Dummy heatmap", "Power Stations", "GeoJSON Heatmaps", "API-backed Heatmaps"])
 
-# if mode == "ABS GPKG map":
-#     # Lazy-import geopandas to avoid heavy deps when not needed
-#     import geopandas as gpd
-#
-#     GPKG_PATH = r"abs_population_data/32180_ERP_2024_SA2_GDA2020.gpkg"
-#
-#     st.sidebar.write("GeoPackage settings")
-#     engine = st.sidebar.selectbox("Read engine", options=["pyogrio", "fiona"], index=0)
-#
-#     # Discover available layers in the GeoPackage and let user select
-#     @st.cache_data(show_spinner=False)
-#     def list_layers(path, prefer_engine="pyogrio", refresh_key=0):
-#         """
-#         Try multiple strategies to list layers:
-#         1) pyogrio.list_layers
-#         2) fiona.listlayers
-#         Returns tuple of layer names; empty tuple if all fail.
-#         refresh_key is included to allow user-triggered refresh bypassing cache.
-#         """
-#         errors = []
-#         layers = []
-#         if prefer_engine == "pyogrio":
-#             # Try pyogrio first
-#             try:
-#                 import pyogrio
-#                 info = pyogrio.list_layers(path)
-#                 layers = [i.name for i in info]
-#             except Exception as e:
-#                 errors.append(f"pyogrio: {e}")
-#             # If still empty, try fiona
-#             if not layers:
-#                 try:
-#                     import fiona
-#                     with fiona.Env():
-#                         layers = list(fiona.listlayers(path))
-#                 except Exception as e:
-#                     errors.append(f"fiona: {e}")
-#         else:
-#             # Try fiona first
-#             try:
-#                 import fiona
-#                 with fiona.Env():
-#                     layers = list(fiona.listlayers(path))
-#             except Exception as e:
-#                 errors.append(f"fiona: {e}")
-#             if not layers:
-#                 try:
-#                     import pyogrio
-#                     info = pyogrio.list_layers(path)
-#                     layers = [i.name for i in info]
-#                 except Exception as e:
-#                     errors.append(f"pyogrio: {e}")
-#         return tuple(layers), " | ".join(errors)
-#
-#     # Allow user to refresh layer listing to avoid stale cache of empty results
-#     refresh = st.sidebar.button("Refresh layers")
-#     layers, list_err = list_layers(GPKG_PATH, prefer_engine=engine, refresh_key=1 if refresh else 0)
-#     if layers:
-#         layer_name = st.sidebar.selectbox("Select layer", options=("<first layer>",) + layers, index=0)
-#         if layer_name == "<first layer>":
-#             layer_name = ""
-#     else:
-#         warn_msg = "Could not list layers. Enter layer name manually."
-#         if list_err:
-#             warn_msg += f" Details: {list_err}"
-#         st.sidebar.warning(warn_msg)
-#         layer_name = st.sidebar.text_input("Layer name (blank = first layer)", value="")
-#
-#     @st.cache_data(show_spinner=True)
-#     def load_gpkg(path, layer, engine):
-#         read_kwargs = {}
-#         # geopandas 1.0: engine can be 'pyogrio' or 'fiona'. Only pass when not None to avoid version quirks.
-#         if engine and engine.strip():
-#             read_kwargs["engine"] = engine
-#         if layer.strip() != "":
-#             read_kwargs["layer"] = layer
-#         gdf = gpd.read_file(path, **read_kwargs)
-#         try:
-#             gdf = gdf.to_crs(4326)
-#         except Exception:
-#             pass
-#         return gdf
-#
-#     with st.spinner("Reading GeoPackage…"):
-#         try:
-#             gdf = load_gpkg(GPKG_PATH, layer_name, engine)
-#         except Exception as e:
-#             # Fallback: try alternate engine
-#             alt = "fiona" if engine == "pyogrio" else "pyogrio"
-#             st.warning(f"Primary read engine '{engine}' failed: {e}. Trying '{alt}'…")
-#             gdf = load_gpkg(GPKG_PATH, layer_name, alt)
-#
-#     st.success(f"Loaded {len(gdf)} features. CRS: {gdf.crs}")
-#     # Diagnostics: warn if no geometries or all are empty
-#     try:
-#         non_empty = gdf.geometry.notna() & ~gdf.geometry.is_empty
-#         if non_empty.sum() == 0:
-#             st.warning("All geometries are empty or missing in the selected layer. Nothing to display.")
-#     except Exception:
-#         pass
-#
-#     # Choose attribute for coloring
-#     numeric_cols = [c for c in gdf.columns if c != gdf.geometry.name and str(gdf[c].dtype).startswith(("int", "float"))]
-#     attr = st.sidebar.selectbox("Color by attribute", options=(numeric_cols or ["None"]))
-#     outlines_only = st.sidebar.checkbox("Show outlines only", value=False)
-#
-#     geojson_obj = json.loads(gdf.to_json())
-#
-#     def make_color(value, vmin, vmax):
-#         if attr == "None" or vmin is None or vmax is None or vmin == vmax or value is None:
-#             return [33, 158, 188, 120]
-#         t = (float(value) - vmin) / (vmax - vmin)
-#         t = max(0.0, min(1.0, t))
-#         r = int(253 * t + 33 * (1 - t))
-#         g = int(174 * t + 158 * (1 - t))
-#         b = int(97 * t + 188 * (1 - t))
-#         return [r, g, b, 140]
-#
-#     vmin = vmax = None
-#     if attr != "None" and attr in gdf.columns:
-#         vmin = float(gdf[attr].min())
-#         vmax = float(gdf[attr].max())
-#
-#     for feat in geojson_obj["features"]:
-#         val = feat["properties"].get(attr) if attr != "None" else None
-#         feat["properties"]["_fill_color"] = make_color(val, vmin, vmax)
-#
-#     minx, miny, maxx, maxy = gdf.total_bounds
-#     center_lat = (miny + maxy) / 2
-#     center_lon = (minx + maxx) / 2
-#
-#     layer = pdk.Layer(
-#         "GeoJsonLayer",
-#         geojson_obj,
-#         stroked=True,
-#         filled=not outlines_only,
-#         get_fill_color="[33,158,188,200]" if outlines_only else "properties._fill_color",
-#         get_line_color=[20, 20, 20, 255],
-#         line_width_min_pixels=1.5,
-#         pickable=True,
-#         extruded=False,
-#     )
-#
-#     # If bounds are degenerate (e.g., single point), fall back to a national view
-#     if not np.isfinite([center_lat, center_lon]).all() or (minx == maxx and miny == maxy):
-#         view_state = pdk.ViewState(latitude=-25.5, longitude=134.5, zoom=3)
-#     else:
-#         view_state = pdk.ViewState(latitude=center_lat, longitude=center_lon, zoom=4)
-#
-#     r = pdk.Deck(
-#         layers=[layer],
-#         initial_view_state=view_state,
-#         map_style="https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
-#         tooltip={"text": "{sa2_name_2021}\\n{sa4_name_2021}\\n{erp_2024}"},
-#         height=650,
-#         parameters={"cull": False},
-#     )
-#
-#     st.pydeck_chart(r, use_container_width=True)
-#
-#     with st.expander("Data preview"):
-#         st.dataframe(gdf.drop(columns=[gdf.geometry.name], errors="ignore").head(1000))
-# elif mode == "Tile Server Map":
-#         st.subheader("Map Data from Tile Server")
-#
-#         tile_server_public = st.sidebar.text_input(
-#             "Tile server URL (browser-accessible)",
-#             value="http://localhost:8080",
-#         )
-#
-#         style_url = f"{tile_server_public}/styles/basic/style.json"  # STYLE JSON
-#
-#         # Center on Zurich (your current demo tiles only cover Zurich)
-#         view_state = pdk.ViewState(latitude=47.3769, longitude=8.5417, zoom=11)
-#
-#         # Add a tiny marker so we know WebGL is rendering even if basemap fails
-#         sanity_layer = pdk.Layer(
-#             "ScatterplotLayer",
-#             data=[{"lon": 8.5417, "lat": 47.3769}],
-#             get_position=["lon", "lat"],
-#             get_radius=200,
-#             pickable=True,
-#         )
-#
-#         r = pdk.Deck(
-#             layers=[sanity_layer],
-#             map_style=style_url,
-#             initial_view_state=view_state,
-#             height=650,
-#             map_provider=None,  # don’t force Mapbox with a custom style
-#         )
-#
-#         st.pydeck_chart(r, use_container_width=True)
-#
 
 if mode == "Dummy heatmap":
     # --- Dummy heatmap mode (existing MVP) ---
@@ -415,7 +221,7 @@ elif mode == "Power Stations":
 
     # --- Load file
     import math
-    with open("map_data/Major_Power_Stations.geo.json", "r", encoding="utf-8") as f:
+    with open("geojsons/Major_Power_Stations.geojson", "r", encoding="utf-8") as f:
         fc = json.load(f)
 
     feats = fc.get("features", [])
@@ -561,3 +367,142 @@ elif mode == "Power Stations":
     with st.expander("Sample feature properties"):
         sample = [ft["properties"] for _, _, ft in pts[:5]]
         st.write(sample if sample else "No point features found.")
+
+elif mode == "API-backed Heatmaps":
+    st.subheader("Browse files from map_baker API")
+
+    import os as _os
+    # Resolve API base URL safely without requiring Streamlit secrets file
+    # Priority: ENV var > Streamlit secrets > default
+    _env_api = _os.environ.get("API_BASE_URL")
+    _secret_api = None
+    try:
+        # st.secrets behaves like a Mapping but raises if secrets.toml missing
+        if hasattr(st, "secrets") and "API_BASE_URL" in st.secrets:  # type: ignore[operator]
+            _secret_api = st.secrets["API_BASE_URL"]
+    except Exception:
+        _secret_api = None
+    API_BASE_URL = _env_api or _secret_api or "http://localhost:8000"
+
+    def _fetch_json(url, params=None):
+        r = requests.get(url, params=params, timeout=30)
+        r.raise_for_status()
+        return r.json()
+
+    def _load_geojson_from_url(url):
+        r = requests.get(url, timeout=60)
+        r.raise_for_status()
+        ct = r.headers.get("content-type", "")
+        if "application/json" in ct or url.endswith((".geojson", ".geo.json")):
+            return r.json()
+        return json.loads(r.content.decode("utf-8"))
+
+    tab1, tab2 = st.tabs(["Source GeoJSONs", "Generated Heatmaps"])  # /api/files vs /api/heatmaps
+
+    st.sidebar.header("Heatmap Settings")
+    radius_pixels = st.sidebar.slider("Radius (pixels)", 5, 120, 40)
+    intensity = st.sidebar.slider("Intensity", 0.1, 5.0, 1.0, 0.1)
+    threshold = st.sidebar.slider("Threshold", 0.0, 0.5, 0.01, 0.01)
+    normalize = st.sidebar.checkbox("Normalize Values", value=False)
+
+    with tab1:
+        st.caption("Files from /api/files (source inputs)")
+        try:
+            payload = _fetch_json(f"{API_BASE_URL}/api/files")
+            files = payload.get("files", [])
+            if not files:
+                st.info("No source GeoJSONs found. Ensure the geojsons directory is mounted.")
+            else:
+                labels = [f"{f['directory']}/{f['name']} ({f['size']} bytes)" for f in files]
+                sel_idx = st.selectbox("Select a source file", list(range(len(labels))), format_func=lambda i: labels[i])
+                selected = files[sel_idx]
+
+                file_url = f"{API_BASE_URL}/api/files/{selected['directory']}/{selected['name']}"
+                geojson = _load_geojson_from_url(file_url)
+
+                value_property = st.text_input("Numeric property for weight", value="value")
+
+                rows = []
+                for ft in geojson.get("features", []):
+                    geom = ft.get("geometry", {})
+                    if geom.get("type") == "Point":
+                        coords = geom.get("coordinates", [None, None])
+                        props = ft.get("properties", {}) or {}
+                        v = props.get(value_property, 1.0)
+                        try:
+                            v = float(0.0 if v is None else v)
+                        except Exception:
+                            v = 0.0
+                        if coords and len(coords) >= 2 and None not in coords[:2]:
+                            rows.append({"lon": coords[0], "lat": coords[1], "value": v})
+
+                df = pd.DataFrame(rows)
+                if normalize and not df.empty:
+                    vmin, vmax = df["value"].min(), df["value"].max()
+                    df["weight"] = (df["value"] - vmin) / (vmax - vmin) if vmax > vmin else df["value"]
+                else:
+                    df["weight"] = df["value"] if not df.empty else []
+
+                layer = pdk.Layer(
+                    "HeatmapLayer",
+                    data=df,
+                    get_position=["lon", "lat"],
+                    get_weight="weight",
+                    radiusPixels=radius_pixels,
+                    intensity=intensity,
+                    threshold=threshold,
+                )
+                view_state = pdk.ViewState(latitude=-30, longitude=135, zoom=4, pitch=0)
+                deck = pdk.Deck(layers=[layer], initial_view_state=view_state, tooltip={"text": "Value: {value}"})
+                st.pydeck_chart(deck, use_container_width=True)
+        except Exception as e:
+            st.error(f"Error listing/fetching source files: {e}")
+
+    with tab2:
+        st.caption("Files from /api/heatmaps (generated outputs)")
+        try:
+            payload = _fetch_json(f"{API_BASE_URL}/api/heatmaps")
+            files = payload.get("files", [])
+            if not files:
+                st.info("No generated heatmaps yet. Use the processing endpoints to create some.")
+            else:
+                names = [f["name"] for f in files]
+                name = st.selectbox("Select a heatmap", names)
+                heatmap_url = f"{API_BASE_URL}/api/heatmaps/{name}"
+                geojson = _load_geojson_from_url(heatmap_url)
+
+                rows = []
+                for ft in geojson.get("features", []):
+                    geom = ft.get("geometry", {})
+                    if geom.get("type") == "Point":
+                        coords = geom.get("coordinates", [None, None])
+                        props = ft.get("properties", {}) or {}
+                        v = props.get("value", 0.0)
+                        try:
+                            v = float(0.0 if v is None else v)
+                        except Exception:
+                            v = 0.0
+                        if coords and len(coords) >= 2 and None not in coords[:2]:
+                            rows.append({"lon": coords[0], "lat": coords[1], "value": v})
+
+                df = pd.DataFrame(rows)
+                if normalize and not df.empty:
+                    vmin, vmax = df["value"].min(), df["value"].max()
+                    df["weight"] = (df["value"] - vmin) / (vmax - vmin) if vmax > vmin else df["value"]
+                else:
+                    df["weight"] = df["value"] if not df.empty else []
+
+                layer = pdk.Layer(
+                    "HeatmapLayer",
+                    data=df,
+                    get_position=["lon", "lat"],
+                    get_weight="weight",
+                    radiusPixels=radius_pixels,
+                    intensity=intensity,
+                    threshold=threshold,
+                )
+                view_state = pdk.ViewState(latitude=-30, longitude=135, zoom=4, pitch=0)
+                deck = pdk.Deck(layers=[layer], initial_view_state=view_state, tooltip={"text": "Value: {value}"})
+                st.pydeck_chart(deck, use_container_width=True)
+        except Exception as e:
+            st.error(f"Error listing/fetching heatmaps: {e}")

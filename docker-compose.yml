@@ -34,6 +34,8 @@ services:
     container_name: map-frontend
     ports:
       - "8501:8501"
+    environment:
+      - API_BASE_URL=http://map-baker:8000
     volumes:
       - ./:/app
       - ./map_data:/app/map_data
