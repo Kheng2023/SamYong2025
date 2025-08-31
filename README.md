@@ -2,6 +2,8 @@
 
 This repository is the work of Sam and Yong for GovHack 2025 competition entry. It includes a FastAPI server with a simple web interface for displaying GeoJSON files as layers on a map, as well as PlantUML diagrams describing the architecture for an interactive heatmap system.
 
+![Logo](fleximap800px.png)
+
 ## Fleximap
 
 A FastAPI server with a Leaflet-based web interface for displaying GeoJSON files as layers on a map.
